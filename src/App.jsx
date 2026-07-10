@@ -1,32 +1,24 @@
 import React, { useRef, useState, useEffect } from 'react';
-import gsap from 'gsap';
-import { useGSAP } from '@gsap/react';
+import { gsap } from "gsap";
+import { useGSAP } from "@gsap/react";
+
+import { CustomEase } from "gsap/CustomEase";
+import { RoughEase } from "gsap/EasePack";
+    
+import { Draggable } from "gsap/Draggable";
+import { MotionPathPlugin } from "gsap/MotionPathPlugin";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { ScrollToPlugin } from "gsap/ScrollToPlugin";
+// ScrollSmoother requires ScrollTrigger
+import { ScrollSmoother } from "gsap/ScrollSmoother";
+import { SplitText } from "gsap/SplitText";
+import { TextPlugin } from "gsap/TextPlugin";
+
+import { TerminalAnimationDemo } from './components/ui/terminal-animation';
 import './App.css';
 
-// Helper component to render justified text lines matching the image spacing gaps
-const JustifiedText = ({ lines }) => {
-  return (
-    <div className="justified-text-container">
-      {lines.map((line, idx) => {
-        const words = line.trim().split(/\s+/);
-        if (words.length <= 1) {
-          return (
-            <div key={idx} className="text-line single-word">
-              <span className="word">{words[0]}</span>
-            </div>
-          );
-        }
-        return (
-          <div key={idx} className="text-line multi-word">
-            {words.map((word, wIdx) => (
-              <span key={wIdx} className="word">{word}</span>
-            ))}
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+gsap.registerPlugin(useGSAP,Draggable,MotionPathPlugin,ScrollTrigger,ScrollToPlugin,ScrollSmoother,SplitText,TextPlugin,RoughEase,CustomEase);
+
 
 // Trust Marquee Component
 const Marquee = () => {
@@ -71,9 +63,11 @@ function App() {
   const navIndicatorRef = useRef(null);
 
   const [activeTab, setActiveTab] = useState('home');
+  const [theme, setTheme] = useState('dark');
   const [billingCycle, setBillingCycle] = useState('monthly');
   const [view, setView] = useState('landing');
   const [authMode, setAuthMode] = useState('login');
+  const [showThemeHint, setShowThemeHint] = useState(true);
   const [dashboardState, setDashboardState] = useState('data');
   const [activeSidebarTab, setActiveSidebarTab] = useState('Dashboard');
   const [workspace, setWorkspace] = useState('loop.intel');
@@ -87,33 +81,51 @@ function App() {
   const [isSendingChat, setIsSendingChat] = useState(false);
   const [selectedFeedbackIndex, setSelectedFeedbackIndex] = useState(0);
 
+
   const navItems = ['home', 'product', 'solutions', 'pricing', 'docs', 'about'];
 
-  const humanLines = [
-    "Driven by curiosity and",
-    "experience, every",
-    "decision begins with",
-    "understanding the",
-    "people behind the",
-    "feedback."
-  ];
 
-  const artificialLines = [
-    "Connecting every",
-    "signal into one",
-    "continuous intelligence",
-    "system, transforming",
-    "conversations into",
-    "confident product",
-    "decisions."
-  ];
+  // Theme toggle handler
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      return next;
+    });
+    setShowThemeHint(false);
+  };
+
+  // 'T' key to toggle theme
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 't' || e.key === 'T') {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        toggleTheme();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [theme]);
+
+  // Set initial theme attribute
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }, []);
 
   // Function to handle smooth scrolling to targeted page ID
   const scrollToSection = (id) => {
     const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-      setActiveTab(id);
+    if (!element) return;
+    setActiveTab(id);
+    const smoother = window.__scrollSmoother;
+    if (smoother) {
+      smoother.scrollTo(element, true, 'top top');
+    } else {
+      gsap.to(window, {
+        duration: 1.1,
+        scrollTo: { y: element, offsetY: 0 },
+        ease: 'power3.inOut'
+      });
     }
   };
 
@@ -204,111 +216,206 @@ function App() {
     }
   };
 
+  const handleCardMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    e.currentTarget.style.setProperty('--mx', `${x}px`);
+    e.currentTarget.style.setProperty('--my', `${y}px`);
+  };
+
   // Entrance animations with GSAP (featuring sequenced curtain preloader & blur reveals)
   useGSAP(() => {
+    // 0. Initialize ScrollSmoother (only on landing page view)
+    let smoother;
+    if (document.querySelector('#smooth-wrapper')) {
+      smoother = ScrollSmoother.create({
+        wrapper: "#smooth-wrapper",
+        content: "#smooth-content",
+        smooth: 1.2,
+        effects: true
+      });
+      window.__scrollSmoother = smoother;
+    }
+
+    // 1. Text Splitting with GSAP SplitText
+    const splitLogo = new SplitText(".logo-text", { type: "chars" });
+    const logoChars = splitLogo.chars;
+
+    const splitHuman = new SplitText(".human-desc", {
+      type: "lines,words",
+      linesClass: "text-line multi-word",
+      wordsClass: "word"
+    });
+
+    const splitArtificial = new SplitText(".artificial-desc", {
+      type: "lines,words",
+      linesClass: "text-line multi-word",
+      wordsClass: "word"
+    });
+
+    // Custom check: if a split line has only 1 word, make it justify-content: flex-start
+    splitHuman.lines.forEach(line => {
+      if (line.querySelectorAll('.word').length <= 1) {
+        line.classList.remove('multi-word');
+        line.classList.add('single-word');
+      }
+    });
+
+    splitArtificial.lines.forEach(line => {
+      if (line.querySelectorAll('.word').length <= 1) {
+        line.classList.remove('multi-word');
+        line.classList.add('single-word');
+      }
+    });
+
+    // 2. Timeline Boot Sequence — middle-slice numerical preloader
     const mainTl = gsap.timeline();
     const counterObj = { value: 0 };
     const counterNode = document.querySelector('.preloader-counter');
 
-    // 1. Tick preloader count 00 to 100
+    // Count from 0 to 100, updating the big number
     mainTl.to(counterObj, {
       value: 100,
-      duration: 2.2,
-      ease: 'power2.out',
+      duration: 2.0,
+      ease: 'power2.inOut',
       onUpdate: () => {
         if (counterNode) {
           const val = Math.floor(counterObj.value);
-          counterNode.textContent = val < 10 ? `0${val}` : val;
+          counterNode.textContent = val < 10 ? `0${val}` : `${val}`;
         }
       }
     });
 
-    // 2. Blur text exit for counter number
-    mainTl.to(counterNode, {
-      filter: 'blur(20px)',
+    // Short hold at 100 then slice panels out
+    mainTl.to('.preloader-counter', {
       opacity: 0,
-      scale: 0.95,
-      duration: 0.5,
-      ease: 'power2.inOut'
-    });
+      duration: 0.25,
+      ease: 'power2.in'
+    }, '+=0.15');
 
-    // 3. Top-down split curtain slide open
+    // Splitting curtain panels slide open
     mainTl.to('.preloader-panel-top', {
-      y: '-50vh',
+      yPercent: -100,
       duration: 1.2,
       ease: 'power4.inOut'
     }, '-=0.2');
 
     mainTl.to('.preloader-panel-bottom', {
-      y: '50vh',
+      yPercent: 100,
       duration: 1.2,
       ease: 'power4.inOut'
-    }, '-=1.2'); // Simulateneously with top panel
+    }, '-=1.2'); // Simultaneously
 
-    // Hide preloader container to restore pointer events to page
+    // Restore pointer events
     mainTl.to('.preloader-container', {
       display: 'none',
       pointerEvents: 'none',
       duration: 0.1
     });
 
-    // 4. Page elements reveal (starts slightly before curtains fully open!)
+    // 3. Hero Elements Entrance Reveals
     mainTl.fromTo(leftHandRef.current, 
-      { x: -500, opacity: 0, filter: 'blur(10px)' },
-      { x: 0, opacity: 1, filter: 'blur(0px)', duration: 1.8, ease: 'power3.out' },
-      '-=1.0' // overlaps with splitting curtain
+      { x: -500, opacity: 0, filter: 'blur(15px)' },
+      { x: 0, opacity: 1, filter: 'blur(0px)', duration: 2.2, ease: 'power3.out' },
+      '-=1.2'
     );
 
     mainTl.fromTo(rightHandRef.current, 
-      { x: 500, opacity: 0, filter: 'blur(10px)' },
-      { x: 0, opacity: 1, filter: 'blur(0px)', duration: 1.8, ease: 'power3.out' },
-      '-=1.8' // matches left hand
+      { x: 500, opacity: 0, filter: 'blur(15px)' },
+      { x: 0, opacity: 1, filter: 'blur(0px)', duration: 2.2, ease: 'power3.out' },
+      '-=2.2' // Sync left & right hands
     );
 
-    mainTl.fromTo('.logo-char',
-      { y: 60, opacity: 0, filter: 'blur(12px)', scale: 0.8 },
+    // Stagger letters of the logo using SplitText characters
+    mainTl.fromTo(logoChars,
+      { y: 80, opacity: 0, filter: 'blur(15px)', scale: 0.8 },
       { 
         y: 0, 
         opacity: 1, 
         filter: 'blur(0px)',
         scale: 1,
-        duration: 1.2, 
+        duration: 1.4, 
         stagger: 0.08,
-        ease: 'power3.out' 
+        ease: 'power4.out' 
       },
-      '-=1.4'
+      '-=1.6'
     );
 
     mainTl.fromTo('.logo-glow-human, .logo-glow-artificial',
       { scale: 0, opacity: 0 },
-      { scale: 1, opacity: 1, duration: 2.2, ease: 'power2.out' },
-      '-=1.2'
+      { scale: 1, opacity: 1, duration: 2.4, ease: 'power2.out' },
+      '-=1.4'
     );
 
     mainTl.fromTo('.logo-subtext',
-      { opacity: 0, filter: 'blur(5px)', y: (i) => (i === 0 ? -10 : 10) },
-      { opacity: 0.7, filter: 'blur(0px)', y: 0, duration: 1.2, stagger: 0.1, ease: 'power2.out' },
+      { opacity: 0, filter: 'blur(6px)', y: (i) => (i === 0 ? -15 : 15) },
+      { opacity: 0.75, filter: 'blur(0px)', y: 0, duration: 1.4, stagger: 0.15, ease: 'power2.out' },
+      '-=1.2'
+    );
+
+    // Blur text reveal for description paragraphs split words
+    mainTl.fromTo([...splitHuman.words, ...splitArtificial.words],
+      { opacity: 0, filter: 'blur(12px)', y: 15 },
+      { 
+        opacity: 0.75, 
+        filter: 'blur(0px)', 
+        y: 0, 
+        duration: 1.2, 
+        stagger: 0.012, 
+        ease: 'power3.out'
+      },
       '-=1.0'
     );
 
-    mainTl.fromTo('.word',
-      { opacity: 0, filter: 'blur(8px)', y: 10 },
-      { 
-        opacity: 1, 
-        filter: 'blur(0px)', 
-        y: 0, 
-        duration: 1, 
-        stagger: 0.012, 
-        ease: 'power2.out'
-      },
+    mainTl.fromTo('.nav-pill',
+      { y: -30, opacity: 0, filter: 'blur(6px)' },
+      { y: 0, opacity: 1, filter: 'blur(0px)', duration: 1.4, ease: 'power3.out' },
       '-=0.8'
     );
 
-    mainTl.fromTo('.nav-pill',
-      { y: -30, opacity: 0, filter: 'blur(5px)' },
-      { y: 0, opacity: 1, filter: 'blur(0px)', duration: 1.2, ease: 'power3.out' },
-      '-=0.6'
-    );
+    // 4. ScrollTrigger section titles blur reveal
+    const secTitles = gsap.utils.toArray('.sec-title');
+    secTitles.forEach(title => {
+      const splitTitle = new SplitText(title, { type: "words" });
+      gsap.fromTo(splitTitle.words,
+        { opacity: 0, filter: 'blur(12px)', y: 20 },
+        {
+          opacity: 1,
+          filter: 'blur(0px)',
+          y: 0,
+          duration: 1.4,
+          stagger: 0.03,
+          ease: 'power3.out',
+          scrollTrigger: {
+            trigger: title,
+            start: "top 85%",
+            toggleActions: "play none none none"
+          }
+        }
+      );
+    });
+
+    const secHeaders = gsap.utils.toArray('.sec-header');
+    secHeaders.forEach(header => {
+      const splitHeader = new SplitText(header, { type: "chars" });
+      gsap.fromTo(splitHeader.chars,
+        { opacity: 0, filter: 'blur(6px)', x: -10 },
+        {
+          opacity: 1,
+          filter: 'blur(0px)',
+          x: 0,
+          duration: 0.8,
+          stagger: 0.04,
+          ease: 'power2.out',
+          scrollTrigger: {
+            trigger: header,
+            start: "top 90%",
+            toggleActions: "play none none none"
+          }
+        }
+      );
+    });
   }, { scope: containerRef });
 
   if (view === 'dashboard') {
@@ -1601,17 +1708,18 @@ function App() {
 
   return (
     <div className="app-container" ref={containerRef}>
-      {/* 0. CURTAIN PRELOADER */}
+      {/* 0. NUMERICAL PRELOADER — middle horizontal slice */}
       <div className="preloader-container">
+        {/* Top half panel */}
         <div className="preloader-panel-top" />
+        {/* Bottom half panel */}
         <div className="preloader-panel-bottom" />
-        <div className="preloader-content">
-          <div className="preloader-counter">00</div>
-        </div>
+        {/* Big centered counter — sits over the slice seam */}
+        <span className="preloader-counter">00</span>
       </div>
 
       {/* SaaS Pill Navigation */}
-      <nav className={`nav-pill ${activeTab === 'about' ? 'about-active' : ''}`}>
+      <nav className={`nav-pill ${activeTab === 'about' ? 'about-active' : ''} ${theme === 'light' ? 'light-mode' : ''}`}>
         {/* Left Brand */}
         <div className="nav-brand" onClick={() => scrollToSection('home')} style={{ cursor: 'pointer' }}>
           <span>loop</span>
@@ -1633,15 +1741,45 @@ function App() {
               }}
               onMouseEnter={handleNavHover}
             >
-              {item}
+              {activeTab === item ? `[ ${item} ]` : item}
             </a>
           ))}
         </div>
 
-        {/* Right CTA */}
-        <a href="#auth" className="nav-cta" onClick={(e) => { e.preventDefault(); setView('auth'); }}>
-          get started ↗
-        </a>
+        {/* Right side: theme toggle + hint + CTA */}
+        <div className="nav-right-group">
+          {showThemeHint && (
+            <span className="nav-theme-hint">press [t] for theme</span>
+          )}
+          <button
+            className="nav-theme-btn"
+            onClick={toggleTheme}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? (
+              // Sun icon for dark mode (switch to light)
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5"/>
+                <line x1="12" y1="1" x2="12" y2="3"/>
+                <line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/>
+                <line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              </svg>
+            ) : (
+              // Moon icon for light mode (switch to dark)
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+            )}
+          </button>
+          <a href="#auth" className="nav-cta" onClick={(e) => { e.preventDefault(); setView('auth'); }}>
+            get started ↗
+          </a>
+        </div>
 
       </nav>
 
@@ -1717,7 +1855,10 @@ function App() {
         <span className="hamburger-line" />
       </button>
 
-      {/* 1. HOME SECTION */}
+      <div id="smooth-wrapper">
+        <div id="smooth-content">
+
+          {/* 1. HOME SECTION */}
       <section id="home" className="section-container home-section">
         {/* Left Hand (Red) - sliding from left side */}
         <div ref={leftHandRef} className="hand-container left-hand">
@@ -1749,10 +1890,7 @@ function App() {
           </span>
 
           <h1 className="logo-text">
-            <span className="logo-char char-l">l</span>
-            <span className="logo-char char-o1">o</span>
-            <span className="logo-char char-o2">o</span>
-            <span className="logo-char char-p">p</span>
+            loop
           </h1>
 
           <span className="logo-subtext human-sub">
@@ -1763,13 +1901,17 @@ function App() {
         {/* Left Text Block */}
         <div ref={leftTextRef} className="text-block text-block-left">
           <h3 className="block-header human-hdr">human</h3>
-          <JustifiedText lines={humanLines} />
+          <p className="human-desc">
+            Driven by curiosity and experience, every decision begins with understanding the people behind the feedback.
+          </p>
         </div>
 
         {/* Right Text Block */}
         <div ref={rightTextRef} className="text-block text-block-right">
           <h3 className="block-header artificial-hdr">artificial</h3>
-          <JustifiedText lines={artificialLines} />
+          <p className="artificial-desc">
+            Connecting every signal into one continuous intelligence system, transforming conversations into confident product decisions.
+          </p>
         </div>
       </section>
 
@@ -1779,22 +1921,57 @@ function App() {
       {/* 2. PRODUCT SECTION */}
       <section id="product" className="section-container product-section">
         <span className="sec-header">[product]</span>
-        <h2 className="sec-title">continuous intelligence for modern engineering teams.</h2>
-        <div className="sec-grid">
-          <div className="product-card">
-            <div className="card-num">01</div>
-            <h3 className="card-title">real-time signals</h3>
-            <p className="card-desc">Process and correlate system logs, events, metrics, and user feedback instantly as they stream through your platform.</p>
+        <h2 className="sec-title">continuous <em className="serif-italic">intelligence</em> for modern engineering teams.</h2>
+
+        {/* Stat Cards Row */}
+        <div className="product-stats-row">
+          <div className="product-stat-card">
+            <div className="psc-icon">⚡</div>
+            <div className="psc-value">{'<'}3ms</div>
+            <div className="psc-label">avg ingestion latency</div>
           </div>
-          <div className="product-card">
-            <div className="card-num">02</div>
-            <h3 className="card-title">conversational context</h3>
-            <p className="card-desc">Inject state context directly into developers' workspaces. Ask questions and review system diagnostics in natural language.</p>
+          <div className="product-stat-card accent">
+            <div className="psc-icon">🔴</div>
+            <div className="psc-value">99.99%</div>
+            <div className="psc-label">uptime SLA</div>
           </div>
-          <div className="product-card">
-            <div className="card-num">03</div>
-            <h3 className="card-title">self-improving feedback</h3>
-            <p className="card-desc">Loop trace patterns back to optimizing models and APIs. Continuously refine confidence variables automatically.</p>
+          <div className="product-stat-card">
+            <div className="psc-icon">📊</div>
+            <div className="psc-value">1B+</div>
+            <div className="psc-label">events processed daily</div>
+          </div>
+          <div className="product-stat-card">
+            <div className="psc-icon">🌐</div>
+            <div className="psc-value">42</div>
+            <div className="psc-label">edge regions</div>
+          </div>
+        </div>
+
+        {/* Feature list */}
+        <div className="product-feature-grid">
+          <div className="pfg-card">
+            <span className="pfg-num">01</span>
+            <div className="pfg-body">
+              <h3 className="pfg-title">real-time <em className="serif-italic">signals</em></h3>
+              <p className="pfg-desc">Process and correlate system logs, events, metrics, and user feedback instantly as they stream through your platform.</p>
+            </div>
+            <div className="pfg-line" />
+          </div>
+          <div className="pfg-card">
+            <span className="pfg-num">02</span>
+            <div className="pfg-body">
+              <h3 className="pfg-title">conversational <em className="serif-italic">context</em></h3>
+              <p className="pfg-desc">Inject state context directly into developers' workspaces. Ask questions and review system diagnostics in natural language.</p>
+            </div>
+            <div className="pfg-line" />
+          </div>
+          <div className="pfg-card">
+            <span className="pfg-num">03</span>
+            <div className="pfg-body">
+              <h3 className="pfg-title">self-improving <em className="serif-italic">feedback</em></h3>
+              <p className="pfg-desc">Loop trace patterns back to optimizing models and APIs. Continuously refine confidence variables automatically.</p>
+            </div>
+            <div className="pfg-line" />
           </div>
         </div>
       </section>
@@ -1802,188 +1979,147 @@ function App() {
       {/* 3. SOLUTIONS SECTION */}
       <section id="solutions" className="section-container solutions-section">
         <span className="sec-header">[solutions]</span>
-        <h2 className="sec-title">tailored workflows built for developers and builders.</h2>
-        <div className="sec-grid">
-          <div className="sol-col">
-            <h3 className="sol-title">incident response</h3>
-            <p className="sol-desc">Automatically triage pipeline failures, identify anomalies in codebases, and compile actionable context guides for debugging.</p>
+        <h2 className="sec-title">tailored <em className="serif-italic">workflows</em> built for developers and builders.</h2>
+        
+        <div className="solutions-accordion">
+          <div className="sol-acc-card">
+            <span className="sol-acc-num">01</span>
+            <h3 className="sol-acc-title">incident <em className="serif-italic">response</em></h3>
+            <p className="sol-acc-desc">Automatically triage pipeline failures, identify anomalies in codebases, and compile actionable context guides for debugging.</p>
+            <span className="sol-acc-cta">telemetry trace ↗</span>
           </div>
-          <div className="sol-col">
-            <h3 className="sol-title">application monitoring</h3>
-            <p className="sol-desc">Track trace routes and user conversions to preemptively optimize core application speeds and UI latency bottlenecks.</p>
+          <div className="sol-acc-card">
+            <span className="sol-acc-num">02</span>
+            <h3 className="sol-acc-title">application <em className="serif-italic">monitoring</em></h3>
+            <p className="sol-acc-desc">Track trace routes and user conversions to preemptively optimize core application speeds and UI latency bottlenecks.</p>
+            <span className="sol-acc-cta">trace routes ↗</span>
           </div>
-          <div className="sol-col">
-            <h3 className="sol-title">model telemetry</h3>
-            <p className="sol-desc">Analyze production prompt-response chains, monitor token costs, safeguard outputs, and track prompt drift over time.</p>
+          <div className="sol-acc-card">
+            <span className="sol-acc-num">03</span>
+            <h3 className="sol-acc-title">model <em className="serif-italic">telemetry</em></h3>
+            <p className="sol-acc-desc">Analyze production prompt-response chains, monitor token costs, safeguard outputs, and track prompt drift over time.</p>
+            <span className="sol-acc-cta">prompt telemetry ↗</span>
           </div>
         </div>
       </section>
 
       {/* 4. PRICING SECTION */}
-      <section id="pricing" className="section-container pricing-section">
-        {/* Background Video */}
-        <video 
-          className="pricing-bg-video" 
-          src="/pricing_bg.mp4" 
-          autoPlay 
-          loop 
-          muted 
-          playsInline 
-        />
-        
-        {/* Dark overlay to make text readable */}
-        <div className="pricing-video-overlay" />
+      <section id="pricing" className="pricing-section-container">
+        <div className="pricing-header-wrapper">
+          <span className="sec-header">[pricing]</span>
+          <h2 className="sec-title pricing-center-title">
+            transparent <em className="serif-italic">plans</em> that scale.
+          </h2>
+          
+          {/* Toggle Switch */}
+          <div 
+            className="billing-toggle-container-top"
+            onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
+          >
+            <span className={`billing-toggle-label ${billingCycle === 'monthly' ? 'active' : ''}`}>monthly</span>
+            <div className={`billing-switch ${billingCycle === 'yearly' ? 'yearly' : ''}`}>
+              <span className="billing-switch-handle" />
+            </div>
+            <span className={`billing-toggle-label ${billingCycle === 'yearly' ? 'active' : ''}`}>
+              yearly <span className="discount-badge">-20%</span>
+            </span>
+          </div>
+        </div>
 
-        {/* Giant Watermark background text */}
-        <div className="pricing-watermark">pricing</div>
-
-        <span className="sec-header">[pricing]</span>
-        <h2 className="sec-title">transparent plans that scale alongside your traffic.</h2>
-        
-        <div className="sec-grid" style={{ position: 'relative', zIndex: 2 }}>
+        <div className="sec-grid price-grid-layout" style={{ position: 'relative', zIndex: 2 }}>
           {/* Card 1: Developer / Free */}
-          <div className="price-card-glass">
-            <span className="price-plan-name">free plan</span>
+          <div className="price-card-glass" onMouseMove={handleCardMouseMove}>
+            <span className="price-plan-name">developer</span>
             <div className="price-val-glass">free</div>
             <ul className="price-features-glass">
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Send up to 2 transfers per month</span>
+                <span>50k telemetry events/mo</span>
               </li>
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Basic transaction history</span>
+                <span>7-day log retention</span>
               </li>
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Email support</span>
+                <span>Basic anomalies detection</span>
               </li>
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Limited currency support (USD, EUR, GBP)</span>
-              </li>
-              <li>
-                <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Basic security features</span>
+                <span>1 active project integration</span>
               </li>
             </ul>
-            <button className="price-btn-glass outlined" onClick={() => setView('auth')}>Get Started</button>
+            <button className="price-btn-glass outlined" onClick={() => setView('auth')}>Start Free</button>
           </div>
 
-          {/* Card 2: Standard Plan (Active) */}
-          <div className="price-card-glass featured">
-            <span className="price-plan-name">standard plan</span>
+          {/* Card 2: Growth Plan (Active) */}
+          <div className="price-card-glass featured" onMouseMove={handleCardMouseMove}>
+            <span className="price-plan-name">growth</span>
             <div className="price-val-glass">
-              {billingCycle === 'monthly' ? '$9.99/m' : '$7.99/m'}
+              {billingCycle === 'monthly' ? '$29' : '$23'}<span className="price-subtext">/mo</span>
             </div>
             <ul className="price-features-glass">
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Unlimited transfers</span>
+                <span>1M telemetry events/mo</span>
               </li>
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Transaction history with export options</span>
+                <span>30-day log retention</span>
               </li>
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Priority email support</span>
+                <span>Full anomalies & drift alerts</span>
               </li>
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Expanded currency support</span>
-              </li>
-              <li>
-                <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Advanced security features</span>
+                <span>5 active project integrations</span>
               </li>
             </ul>
-            <button className="price-btn-glass filled" onClick={() => setView('auth')}>Get Started</button>
+            <button className="price-btn-glass filled" onClick={() => setView('auth')}>Unlock Growth</button>
           </div>
 
-          {/* Card 3: Pro Plan */}
-          <div className="price-card-glass">
-            <span className="price-plan-name">pro plan</span>
-            <div className="price-val-glass">
-              {billingCycle === 'monthly' ? '$19.99/m' : '$15.99/m'}
-            </div>
+          {/* Card 3: Enterprise Plan */}
+          <div className="price-card-glass" onMouseMove={handleCardMouseMove}>
+            <span className="price-plan-name">enterprise</span>
+            <div className="price-val-glass">custom</div>
             <ul className="price-features-glass">
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Unlimited transfers with priority processing</span>
+                <span>Unlimited ingestion events</span>
               </li>
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Comprehensive transaction analytics</span>
+                <span>Custom data retention policies</span>
               </li>
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>24/7 priority support</span>
+                <span>Dedicated edge node isolation</span>
               </li>
               <li>
                 <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Full currency support</span>
-              </li>
-              <li>
-                <span className="price-check-circle"><svg width="8" height="6" viewBox="0 0 10 8" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4L3.5 6.5L9 1" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                <span>Enhanced security features</span>
+                <span>99.99% ingestion SLA support</span>
               </li>
             </ul>
-            <button className="price-btn-glass outlined" onClick={() => setView('auth')}>Get Started</button>
+            <button className="price-btn-glass outlined" onClick={() => setView('auth')}>Contact Sales</button>
           </div>
-        </div>
-
-        {/* Toggle Switch */}
-        <div 
-          className="billing-toggle-container"
-          onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-        >
-          <div className={`billing-switch ${billingCycle === 'yearly' ? 'yearly' : ''}`}>
-            <span className="billing-switch-handle" />
-          </div>
-          <span className={`billing-toggle-label ${billingCycle === 'yearly' ? 'active' : ''}`}>
-            Billed Yearly
-          </span>
-        </div>
-
-        {/* Hierarchy vertical link line */}
-        <div className="pricing-hierarchy-line">
-          <span className="pricing-hierarchy-badge">Plans</span>
         </div>
       </section>
 
       {/* 5. DOCS SECTION */}
-      <section id="docs" className="section-container docs-section">
-        <span className="sec-header">[docs]</span>
-        <h2 className="sec-title">integrate inside three lines of code.</h2>
-        <div className="docs-layout">
-          <div className="docs-info">
-            <p className="docs-desc">Install our lightweight SDK, declare the Loop trace client, and start logging telemetry logs. We support Node, Python, Rust, and Go runtimes natively.</p>
-            <div className="docs-languages">
-              <span className="lang-tag active">node.js</span>
-              <span className="lang-tag">python</span>
-              <span className="lang-tag">rust</span>
-              <span className="lang-tag">go</span>
-            </div>
-          </div>
+      <section id="docs" className="docs-section-centered">
+        <div className="docs-header-block">
+          <span className="sec-header">[docs]</span>
+          <h2 className="sec-title docs-center-title">
+            integrate inside <em className="serif-italic">three lines</em> of code.
+          </h2>
+          <p className="docs-center-desc">
+            Install our lightweight SDK, declare the Loop trace client, and start logging telemetry logs. We support Node, Python, Rust, and Go runtimes natively.
+          </p>
+        </div>
 
-          <div className="terminal-card">
-            <div className="terminal-header">
-              <div className="terminal-buttons">
-                <span className="term-btn red" />
-                <span className="term-btn yellow" />
-                <span className="term-btn green" />
-              </div>
-              <span className="term-title">QuickStart.js</span>
-            </div>
-            <div className="terminal-body">
-              <pre className="code-block">
-                <span className="code-keyword">import</span> {'{'} LoopClient {'}'} <span className="code-keyword">from</span> <span className="code-string">'@loop/sdk'</span>;<br /><br />
-                <span className="code-keyword">const</span> loop = <span className="code-keyword">new</span> LoopClient({'{'} apiKey: <span className="code-string">'lp_live_83b1c'</span> {'}'});<br />
-                <span className="code-keyword">await</span> loop.track(<span className="code-string">'user_signup_pipeline'</span>, {'{'} userId: 932 {'}'});
-              </pre>
-            </div>
-          </div>
+        <div className="docs-terminal-centered-wrapper">
+          <TerminalAnimationDemo />
         </div>
       </section>
 
@@ -2031,6 +2167,7 @@ function App() {
           </div>
         </div>
       </section>
+
 
       {/* 7. FOOTER SECTION */}
       <footer className="footer-container">
@@ -2107,6 +2244,8 @@ function App() {
           </div>
         </div>
       </footer>
+        </div>
+      </div>
     </div>
   );
 }
