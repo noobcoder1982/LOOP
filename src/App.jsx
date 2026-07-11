@@ -382,8 +382,8 @@ function App() {
     );
 
     mainTl.fromTo('.nav-pill',
-      { y: -30, opacity: 0, filter: 'blur(6px)' },
-      { y: 0, opacity: 1, filter: 'blur(0px)', duration: 1.4, ease: 'power3.out' },
+      { y: -30, opacity: 0 },
+      { y: 0, opacity: 1, duration: 1.4, ease: 'power3.out', clearProps: "all" },
       '-=0.8'
     );
 
