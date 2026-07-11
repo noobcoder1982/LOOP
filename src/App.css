@@ -147,60 +147,33 @@ body {
   z-index: 100;
   width: 88%;
   max-width: 1100px;
-  padding: 5px 10px;
+  padding: 5px 10px; /* Restored padding */
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   pointer-events: auto;
 
-  /* Translucent dark glass background gradient (forces fallback visual contrast when browser backdrop-filter turns off during scroll translate3d) */
-  background:
-    linear-gradient(
-      135deg,
-      rgba(20, 20, 24, 0.72) 0%,
-      rgba(10, 10, 12, 0.64) 40%,
-      rgba(15, 15, 18, 0.68) 80%,
-      rgba(24, 24, 28, 0.76) 100%
-    );
-  backdrop-filter: blur(28px) saturate(180%) brightness(1.08);
-  -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(1.08);
+  /* Standard CSS Glassmorphism */
+  background: rgba(12, 12, 14, 0.45); /* slightly higher opacity for contrast */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  
   border-radius: 9999px;
-  border-top: 1px solid rgba(255,255,255,0.38);
-  border-left: 1px solid rgba(255,255,255,0.18);
-  border-right: 1px solid rgba(255,255,255,0.06);
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  border-top: 1px solid rgba(255,255,255,0.22);
+  border-left: 1px solid rgba(255,255,255,0.12);
+  border-right: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
 
-  /* Softer shadow */
   box-shadow:
-    0 1.5px 0 0 rgba(255,255,255,0.38) inset,
-    0 -1px 0 0 rgba(0,0,0,0.08) inset,
-    0 8px 28px rgba(0,0,0,0.32),
-    0 2px 6px rgba(0,0,0,0.18),
-    0 0 0 0.5px rgba(0,0,0,0.12);
+    0 1.5px 0 0 rgba(255,255,255,0.28) inset,
+    0 8px 32px rgba(0,0,0,0.28),
+    0 2px 8px rgba(0,0,0,0.15);
 
   transition: box-shadow 0.5s ease, background 0.5s ease;
 }
 
-/* Prismatic shimmer layer — sits over the pill */
-.nav-pill::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    105deg,
-    transparent 0%,
-    rgba(255,255,255,0.12) 30%,
-    rgba(255,220,200,0.08) 50%,
-    rgba(200,220,255,0.08) 70%,
-    transparent 100%
-  );
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Specular highlight bar at top edge */
+/* Specular highlight bar at top edge — kept, since it's decorative HTML */
 .nav-pill::after {
   content: '';
   position: absolute;
@@ -212,20 +185,26 @@ body {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255,255,255,0.85) 30%,
-    rgba(255,255,255,0.95) 50%,
-    rgba(255,255,255,0.85) 70%,
+    rgba(255,255,255,0.75) 30%,
+    rgba(255,255,255,0.9) 50%,
+    rgba(255,255,255,0.75) 70%,
     transparent
   );
-  opacity: 0.9;
+  opacity: 0.8;
   pointer-events: none;
-  z-index: 1;
+  z-index: 3;
 }
 
 .nav-pill > * {
   position: relative;
   z-index: 2;
 }
+
+/* Inner content wrapper for FluidGlass nav */
+.nav-inner-content {
+  pointer-events: auto;
+}
+
 
 /* Brand */
 .nav-brand {
@@ -2103,83 +2082,123 @@ body {
   text-shadow: 0 0 8px #ff2a2a;
 }
 
-/* --- Preloader Section (Minimalist Redesign) --- */
+/* ─── Cinematic Preloader ─────────────────────────────────────── */
+
 .preloader-container {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
+  background: transparent;
   z-index: 99999;
   pointer-events: all;
   overflow: hidden;
-  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.preloader-panel-left {
+.preloader-panel-top {
   position: absolute;
   top: 0;
   left: 0;
-  width: 50vw;
-  height: 100vh;
+  width: 100vw;
+  height: 50vh;
   background: #000000;
   z-index: 1;
   will-change: transform;
-  border-right: 0.5px solid rgba(255, 255, 255, 0.04);
 }
 
-.preloader-panel-right {
+.preloader-panel-bottom {
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 50vw;
-  height: 100vh;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  height: 50vh;
   background: #000000;
   z-index: 1;
   will-change: transform;
-  border-left: 0.5px solid rgba(255, 255, 255, 0.04);
 }
 
-.preloader-seam {
+/* ── Typography Stage (Scenes 1 & 2) ───────────────────────────── */
+.preloader-type-stage {
   position: absolute;
-  left: 50%;
-  top: 0;
-  width: 1px;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  transform: translateX(-50%);
-  z-index: 10;
-  pointer-events: none;
-  box-shadow: 0 0 4px rgba(255, 255, 255, 0);
-  will-change: opacity, background, box-shadow;
-}
-
-.preloader-counter-wrapper {
-  position: absolute;
-  bottom: 8vh;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 20;
-  pointer-events: none;
-  font-family: 'Space Mono', monospace;
-  font-weight: 500;
+  inset: 0;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
-  will-change: opacity, transform;
+  gap: 0.55em;
+  pointer-events: none;
+  z-index: 2;
+  /* gap between words: LOOP · X · HUMAN */
 }
 
-.preloader-counter-num {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.45);
-  letter-spacing: -0.02em;
+.preloader-word {
+  display: inline-flex;
+  align-items: center;
+  overflow: visible;
 }
 
-.preloader-counter-unit {
-  font-size: 0.62rem;
+.preloader-word-mask {
+  overflow: hidden;
+  /* clip-path driven by GSAP */
+  clip-path: inset(0 0 100% 0);
+  will-change: clip-path;
+  display: flex;
+  align-items: center;
+}
+
+.preloader-word-inner {
+  display: block;
+  font-family: 'Space Grotesk', 'Helvetica Now', 'Neue Haas Grotesk', Helvetica, Arial, sans-serif;
+  font-size: clamp(3.5rem, 9vw, 8rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: #ffffff;
+  white-space: nowrap;
+  user-select: none;
+  /* Optical baseline alignment */
+  transform: translateY(0.02em);
+}
+
+.preloader-word-inner.pl-accent {
   color: #ff2a2a;
-  margin-left: 2px;
+  /* Red X accent */
 }
+
+/* ── Slice Lines (Scene 2 destruction) ────────────────────────── */
+.preloader-slices {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.preloader-slice {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #000000;
+  transform-origin: left center;
+  will-change: transform, opacity;
+  /* Slices appear as black horizontal cuts erasing the white text below */
+}
+
+/* ── Wipe Line (Scene 3) ─────────────────────────────────────── */
+.preloader-wipe-line {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 2px;
+  background: #ffffff;
+  will-change: transform, height, opacity;
+  z-index: 20;
+}
+
 
 /* --- ScrollSmoother base wrappers --- */
 #smooth-wrapper {

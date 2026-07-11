@@ -149,25 +149,55 @@ class AsciiFilter {
   asciify(ctx, w, h) {
     if (w && h) {
       const imgData = ctx.getImageData(0, 0, w, h).data;
-      let str = '';
+      let htmlStr = '';
+      
       for (let y = 0; y < h; y++) {
+        let currentSpanColor = null;
+        let currentSpanText = '';
+        
         for (let x = 0; x < w; x++) {
           const i = x * 4 + y * 4 * w;
           const [r, g, b, a] = [imgData[i], imgData[i + 1], imgData[i + 2], imgData[i + 3]];
 
-          if (a === 0) {
-            str += ' ';
-            continue;
+          let char = ' ';
+          let color = '';
+
+          if (a > 0) {
+            let gray = (0.3 * r + 0.6 * g + 0.1 * b) / 255;
+            let idx = Math.floor((1 - gray) * (this.charset.length - 1));
+            if (this.invert) idx = this.charset.length - idx - 1;
+            char = this.charset[idx];
+            
+            // Render left 48% as red, right as white
+            color = (x < w * 0.48) ? '#ff2a2a' : '#ffffff';
           }
 
-          let gray = (0.3 * r + 0.6 * g + 0.1 * b) / 255;
-          let idx = Math.floor((1 - gray) * (this.charset.length - 1));
-          if (this.invert) idx = this.charset.length - idx - 1;
-          str += this.charset[idx];
+          if (color !== currentSpanColor) {
+            if (currentSpanText) {
+              if (currentSpanColor) {
+                htmlStr += `<span style="color: ${currentSpanColor}">${currentSpanText}</span>`;
+              } else {
+                htmlStr += currentSpanText;
+              }
+            }
+            currentSpanColor = color;
+            currentSpanText = char;
+          } else {
+            currentSpanText += char;
+          }
         }
-        str += '\n';
+        
+        if (currentSpanText) {
+          if (currentSpanColor) {
+            htmlStr += `<span style="color: ${currentSpanColor}">${currentSpanText}</span>`;
+          } else {
+            htmlStr += currentSpanText;
+          }
+        }
+        htmlStr += '\n';
       }
-      this.pre.innerHTML = str;
+      
+      this.pre.innerHTML = htmlStr;
     }
   }
 
@@ -520,12 +550,7 @@ export default function ASCIIText({
           position: absolute;
           left: 0;
           top: 0;
-          background-image: radial-gradient(circle, #ff6188 0%, #fc9867 50%, #ffd866 100%);
-          background-attachment: fixed;
-          -webkit-text-fill-color: transparent;
-          -webkit-background-clip: text;
           z-index: 9;
-          mix-blend-mode: difference;
         }
       `}</style>
     </div>

@@ -16,6 +16,7 @@ import { TextPlugin } from "gsap/TextPlugin";
 
 import { TerminalAnimationDemo } from './components/ui/terminal-animation';
 import ASCIIText from './components/ui/ASCIIText';
+
 import './App.css';
 
 gsap.registerPlugin(useGSAP,Draggable,MotionPathPlugin,ScrollTrigger,ScrollToPlugin,ScrollSmoother,SplitText,TextPlugin,RoughEase,CustomEase);
@@ -316,7 +317,8 @@ function App() {
     // Lock scrolling during preloader
     document.body.style.overflow = 'hidden';
 
-    // 2. Timeline Boot Sequence
+    // ─── CINEMATIC PRELOADER TIMELINE ───────────────────────────────
+    // Scene 1 → 2 → 3 per the design brief
     const mainTl = gsap.timeline({
       onComplete: () => {
         setShowPreloader(false);
@@ -324,60 +326,94 @@ function App() {
       }
     });
 
-    const counterObj = { value: 0 };
+    // ── SCENE 1: Reveal "LOOP X HUMAN" via horizontal clip-path masks ──
+    // Each word's .preloader-word-mask starts clipped (height 0) and opens downward
+    // revealing the text as if a shutter is pulled away.
 
-    // Fade in the elegant counter
-    mainTl.fromTo('.preloader-counter-wrapper',
-      { opacity: 0, y: 15 },
-      { opacity: 0.45, y: 0, duration: 0.6, ease: 'power2.out' }
-    );
+    // Start: all word masks fully closed (clipPath height = 0%)
+    gsap.set('.preloader-word-mask', { clipPath: 'inset(0 0 100% 0)' });
+    gsap.set('.preloader-slice', { scaleX: 0, opacity: 0 });
 
-    // Tick count 00 to 100
-    mainTl.to(counterObj, {
-      value: 100,
-      duration: 1.8,
-      ease: 'power2.out',
-      onUpdate: () => {
-        const numNode = document.querySelector('.preloader-counter-num');
-        if (numNode) {
-          const val = Math.floor(counterObj.value);
-          numNode.textContent = val < 10 ? `0${val}` : val;
-        }
-      }
+    // Reveal LOOP X HUMAN with staggered shutter-open (bottom edge of mask rises up)
+    // At t=0.3s
+    mainTl.to('.preloader-word-mask', {
+      clipPath: 'inset(0 0 0% 0)',
+      duration: 0.9,
+      ease: 'expo.inOut',
+      stagger: 0.1
+    }, 0.3);
+
+    // Brief hold after full reveal (timeline position ~1.3s)
+
+    // ── SCENE 2: Slicing lines travel across, destroying X and HUMAN ──
+    // At t=1.3s, horizontal slice lines scan across the type stage
+    const slices = gsap.utils.toArray('.preloader-slice');
+    const stageHeight = 1; // normalized, we space slices across the type area height
+
+    // Animate each slice line: it scans from left to right then vanishes
+    slices.forEach((slice, i) => {
+      // Offset slices vertically by setting their top position
+      gsap.set(slice, {
+        top: `${28 + i * 10}%`, // spread across the typography area
+        transformOrigin: 'left center',
+      });
+      mainTl.fromTo(slice,
+        { scaleX: 0, opacity: 1 },
+        { scaleX: 1, opacity: 1, duration: 0.22, ease: 'power4.inOut' },
+        1.3 + i * 0.1
+      );
+      // After each slice passes, it fades while cutting through text
+      mainTl.to(slice, {
+        scaleX: 1, opacity: 0, duration: 0.15, ease: 'power2.in'
+      }, 1.3 + i * 0.1 + 0.22);
     });
 
-    // Fade out the counter once finished
-    mainTl.to('.preloader-counter-wrapper', {
-      opacity: 0,
-      y: -10,
+    // X word: clip it out (masked to 0 height) as slices cut through at t=1.55s
+    mainTl.to('#pl-word-x .preloader-word-mask', {
+      clipPath: 'inset(50% 0 50% 0)',
+      duration: 0.4,
+      ease: 'power4.inOut'
+    }, 1.5);
+
+    // HUMAN word: collapse via horizontal clip a moment later
+    mainTl.to('#pl-word-human .preloader-word-mask', {
+      clipPath: 'inset(50% 0 50% 0)',
       duration: 0.45,
-      ease: 'power2.in'
-    }, '+=0.1');
-
-    // Seam subtly catches light
-    mainTl.fromTo('.preloader-seam',
-      { opacity: 0.05, background: 'rgba(255, 255, 255, 0.04)', boxShadow: '0 0 0px rgba(255, 255, 255, 0)' },
-      { opacity: 1, background: 'rgba(255, 255, 255, 0.95)', boxShadow: '0 0 12px rgba(255, 255, 255, 0.5)', duration: 0.5, ease: 'power2.inOut', yoyo: true, repeat: 1 }
-    );
-
-    // Splitting curtain panels slide open like sliding doors
-    mainTl.to('.preloader-panel-left', {
-      xPercent: -100,
-      duration: 1.6,
       ease: 'power4.inOut'
-    }, '+=0.1');
+    }, 1.7);
 
-    mainTl.to('.preloader-panel-right', {
-      xPercent: 100,
-      duration: 1.6,
+    // ── LOOP word recenters itself after X & HUMAN are gone ──
+    // The type-stage has flexbox so LOOP naturally centers when siblings disappear.
+    // We also subtly nudge its position for a breathing-room feel.
+    mainTl.to('#pl-word-loop', {
+      x: 0,
+      duration: 0.6,
+      ease: 'expo.inOut'
+    }, 2.0);
+
+    // Brief hold with only LOOP visible (~2.2–3.0s)
+
+    // ── SCENE 3: Curtain cut middle slice (top / down open) ──
+    // At t=3.1s, the top and bottom panels split open, revealing the site underneath
+    mainTl.to('.preloader-panel-top', {
+      yPercent: -100,
+      duration: 1.2,
       ease: 'power4.inOut'
-    }, '<');
+    }, 3.1);
 
-    mainTl.to('.preloader-seam', {
+    mainTl.to('.preloader-panel-bottom', {
+      yPercent: 100,
+      duration: 1.2,
+      ease: 'power4.inOut'
+    }, 3.1);
+
+    // Simultaneously fade out and scale up the LOOP text smoothly
+    mainTl.to('.preloader-type-stage', {
       opacity: 0,
-      duration: 0.2,
-      ease: 'power2.inOut'
-    }, '<');
+      scale: 1.1,
+      duration: 0.8,
+      ease: 'power3.out'
+    }, 3.1);
 
     // 3. Hero Elements Entrance Reveals
     mainTl.fromTo(leftHandRef.current, 
@@ -1785,9 +1821,9 @@ function App() {
         <div className="nav-links" onMouseLeave={handleNavLeave}>
           <div ref={navIndicatorRef} className="nav-indicator" />
           {navItems.map((item) => (
-            <a
+            <a 
               key={item}
-              href={`#${item}`}
+              href={`#${item}`} 
               data-tab={item}
               className={`nav-item ${activeTab === item ? 'active' : ''}`}
               onClick={(e) => {
@@ -1801,13 +1837,13 @@ function App() {
           ))}
         </div>
 
-        {/* Right side: theme toggle + hint + CTA */}
+        {/* Right: theme toggle + hint + CTA */}
         <div className="nav-right-group">
           {showThemeHint && (
             <span className="nav-theme-hint">press [t] to switch theme</span>
           )}
-          <button
-            className="nav-theme-btn"
+          <button 
+            className="nav-theme-btn" 
             onClick={toggleTheme}
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
           >
@@ -1817,7 +1853,6 @@ function App() {
             get started ↗
           </a>
         </div>
-
       </nav>
 
       {/* Sliding Mobile Menu Overlay */}
@@ -1893,15 +1928,42 @@ function App() {
       </button>
 
       <div className="app-container" ref={containerRef}>
-        {/* 0. MINIMALIST PRELOADER */}
+        {/* 0. CINEMATIC PRELOADER */}
         {showPreloader && (
           <div className="preloader-container">
-            <div className="preloader-panel-left" />
-            <div className="preloader-panel-right" />
-            <div className="preloader-seam" />
-            <div className="preloader-counter-wrapper">
-              <span className="preloader-counter-num">00</span>
-              <span className="preloader-counter-unit">%</span>
+            {/* Top and Bottom panels for curtain cut exit */}
+            <div className="preloader-panel-top" />
+            <div className="preloader-panel-bottom" />
+            
+            {/* Scene 1 & 2 — typography */}
+            <div className="preloader-type-stage">
+              {/* LOOP word group — stays alive into Scene 2 */}
+              <div className="preloader-word" id="pl-word-loop">
+                <div className="preloader-word-mask">
+                  <span className="preloader-word-inner">LOOP</span>
+                </div>
+              </div>
+              {/* X — sliced away in Scene 2 */}
+              <div className="preloader-word" id="pl-word-x">
+                <div className="preloader-word-mask">
+                  <span className="preloader-word-inner pl-accent">X</span>
+                </div>
+              </div>
+              {/* HUMAN — sliced away in Scene 2 */}
+              <div className="preloader-word" id="pl-word-human">
+                <div className="preloader-word-mask">
+                  <span className="preloader-word-inner">HUMAN</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Slice lines overlay — animated in Scene 2 */}
+            <div className="preloader-slices" aria-hidden="true">
+              <div className="preloader-slice" />
+              <div className="preloader-slice" />
+              <div className="preloader-slice" />
+              <div className="preloader-slice" />
+              <div className="preloader-slice" />
             </div>
           </div>
         )}
