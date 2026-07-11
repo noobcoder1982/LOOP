@@ -110,6 +110,7 @@ function App() {
   const [view, setView] = useState('landing');
   const [authMode, setAuthMode] = useState('login');
   const [showThemeHint, setShowThemeHint] = useState(true);
+  const [showPreloader, setShowPreloader] = useState(true);
   const [dashboardState, setDashboardState] = useState('data');
   const [activeSidebarTab, setActiveSidebarTab] = useState('Dashboard');
   const [workspace, setWorkspace] = useState('loop.intel');
@@ -311,63 +312,41 @@ function App() {
       }
     });
 
+    // Lock scrolling during preloader
+    document.body.style.overflow = 'hidden';
+
     // 2. Timeline Boot Sequence
-    const mainTl = gsap.timeline();
-    const counterObj = { value: 0 };
-    const counterNode = document.querySelector('.preloader-counter');
-
-    // Fade in content container slightly
-    mainTl.fromTo('.preloader-content', 
-      { opacity: 0, y: 10 },
-      { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out' }
-    );
-
-    // Tick preloader count 00 to 100 & animate horizontal bar width
-    mainTl.to(counterObj, {
-      value: 100,
-      duration: 2.2,
-      ease: 'power2.out',
-      onUpdate: () => {
-        if (counterNode) {
-          const val = Math.floor(counterObj.value);
-          counterNode.textContent = val < 10 ? `0${val}` : val;
-          
-          // Animate progress bar width
-          const progressBarNode = document.querySelector('.preloader-bar-progress');
-          if (progressBarNode) {
-            progressBarNode.style.width = `${val}%`;
-          }
-        }
+    const mainTl = gsap.timeline({
+      onComplete: () => {
+        setShowPreloader(false);
+        document.body.style.overflow = '';
       }
     });
 
-    // Fade out preloader content
-    mainTl.to('.preloader-content', {
+    // Seam subtly catches light
+    mainTl.fromTo('.preloader-seam',
+      { opacity: 0.05, background: 'rgba(255, 255, 255, 0.04)', boxShadow: '0 0 0px rgba(255, 255, 255, 0)' },
+      { opacity: 1, background: 'rgba(255, 255, 255, 0.95)', boxShadow: '0 0 12px rgba(255, 255, 255, 0.5)', duration: 0.5, ease: 'power2.inOut', yoyo: true, repeat: 1 }
+    );
+
+    // Splitting curtain panels slide open like sliding doors
+    mainTl.to('.preloader-panel-left', {
+      xPercent: -100,
+      duration: 1.6,
+      ease: 'power4.inOut'
+    }, '+=0.1');
+
+    mainTl.to('.preloader-panel-right', {
+      xPercent: 100,
+      duration: 1.6,
+      ease: 'power4.inOut'
+    }, '<');
+
+    mainTl.to('.preloader-seam', {
       opacity: 0,
-      y: -10,
-      duration: 0.5,
-      ease: 'power2.in'
-    }, '+=0.2');
-
-    // Splitting curtain panels slide open
-    mainTl.to('.preloader-panel-top', {
-      yPercent: -100,
-      duration: 1.2,
-      ease: 'power4.inOut'
-    }, '-=0.2');
-
-    mainTl.to('.preloader-panel-bottom', {
-      yPercent: 100,
-      duration: 1.2,
-      ease: 'power4.inOut'
-    }, '-=1.2'); // Simultaneously
-
-    // Restore pointer events
-    mainTl.to('.preloader-container', {
-      display: 'none',
-      pointerEvents: 'none',
-      duration: 0.1
-    });
+      duration: 0.2,
+      ease: 'power2.inOut'
+    }, '<');
 
     // 3. Hero Elements Entrance Reveals
     mainTl.fromTo(leftHandRef.current, 
@@ -1884,22 +1863,13 @@ function App() {
 
       <div className="app-container" ref={containerRef}>
         {/* 0. MINIMALIST PRELOADER */}
-        <div className="preloader-container">
-          <div className="preloader-panel-top" />
-          <div className="preloader-panel-bottom" />
-          
-          <div className="preloader-content">
-            <div className="preloader-brand">loop.intelligence</div>
-            <div className="preloader-bar-wrapper">
-              <div className="preloader-bar-bg" />
-              <div className="preloader-bar-progress" />
-            </div>
-            <div className="preloader-counter-container">
-              <span className="preloader-counter">00</span>
-              <span className="preloader-percent">%</span>
-            </div>
+        {showPreloader && (
+          <div className="preloader-container">
+            <div className="preloader-panel-left" />
+            <div className="preloader-panel-right" />
+            <div className="preloader-seam" />
           </div>
-        </div>
+        )}
 
         <div id="smooth-wrapper">
           <div id="smooth-content">
