@@ -32,7 +32,7 @@ const Marquee = () => {
     { name: 'airbnb', color: '#ff5a5f' },
     { name: 'replicate', color: '#00f0ff' }
   ];
-
+  
 
   // Duplicate list to ensure seamless looping marquee
   const marqueeList = [...companies, ...companies, ...companies];
@@ -229,15 +229,15 @@ function App() {
   useGSAP(() => {
     // 0. Initialize ScrollSmoother (only on landing page view)
     let smoother;
-    // if (document.querySelector('#smooth-wrapper')) {
-    //   smoother = ScrollSmoother.create({
-    //     wrapper: "#smooth-wrapper",
-    //     content: "#smooth-content",
-    //     smooth: 1.2,
-    //     effects: true
-    //   });
-    //   window.__scrollSmoother = smoother;
-    // }
+    if (document.querySelector('#smooth-wrapper')) {
+      smoother = ScrollSmoother.create({
+        wrapper: "#smooth-wrapper",
+        content: "#smooth-content",
+        smooth: 1.2,
+        effects: true
+      });
+      window.__scrollSmoother = smoother;
+    }
 
     // 1. Text Splitting with GSAP SplitText
     const splitLogo = new SplitText(".logo-text", { type: "chars" });
