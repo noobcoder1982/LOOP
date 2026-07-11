@@ -602,8 +602,8 @@ body {
 
 .logo-text-ascii-wrapper {
   position: relative;
-  width: 480px;
-  height: 160px;
+  width: 780px;
+  height: 250px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -612,8 +612,8 @@ body {
 
 @media (max-width: 900px) {
   .logo-text-ascii-wrapper {
-    width: 320px;
-    height: 110px;
+    width: 380px;
+    height: 130px;
   }
 }
 

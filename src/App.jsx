@@ -1941,7 +1941,7 @@ function App() {
           </span>
 
           <div className="logo-text-ascii-wrapper">
-            <ASCIIText text="loop" enableWaves={true} asciiFontSize={8} />
+            <ASCIIText text="loop" enableWaves={true} asciiFontSize={8} planeBaseHeight={14} />
           </div>
 
           <span className="logo-subtext human-sub">
