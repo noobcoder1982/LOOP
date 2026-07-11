@@ -600,6 +600,23 @@ body {
   position: relative;
 }
 
+.logo-text-ascii-wrapper {
+  position: relative;
+  width: 480px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .logo-text-ascii-wrapper {
+    width: 320px;
+    height: 110px;
+  }
+}
+
 .logo-char {
   display: inline-block;
   transform-origin: center;

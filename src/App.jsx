@@ -15,6 +15,7 @@ import { SplitText } from "gsap/SplitText";
 import { TextPlugin } from "gsap/TextPlugin";
 
 import { TerminalAnimationDemo } from './components/ui/terminal-animation';
+import ASCIIText from './components/ui/ASCIIText';
 import './App.css';
 
 gsap.registerPlugin(useGSAP,Draggable,MotionPathPlugin,ScrollTrigger,ScrollToPlugin,ScrollSmoother,SplitText,TextPlugin,RoughEase,CustomEase);
@@ -282,8 +283,8 @@ function App() {
     }
 
     // 1. Text Splitting with GSAP SplitText
-    const splitLogo = new SplitText(".logo-text", { type: "chars" });
-    const logoChars = splitLogo.chars;
+    const logoNode = document.querySelector(".logo-text");
+    const logoTarget = logoNode ? new SplitText(logoNode, { type: "chars" }).chars : ".logo-text-ascii-wrapper";
 
     const splitHuman = new SplitText(".human-desc", {
       type: "lines,words",
@@ -391,8 +392,8 @@ function App() {
       '-=2.2' // Sync left & right hands
     );
 
-    // Stagger letters of the logo using SplitText characters
-    mainTl.fromTo(logoChars,
+    // Stagger letters or animate the ASCIIText container of the logo
+    mainTl.fromTo(logoTarget,
       { y: 80, opacity: 0, filter: 'blur(15px)', scale: 0.8 },
       { 
         y: 0, 
@@ -1939,9 +1940,9 @@ function App() {
             artificial
           </span>
 
-          <h1 className="logo-text">
-            loop
-          </h1>
+          <div className="logo-text-ascii-wrapper">
+            <ASCIIText text="loop" enableWaves={true} asciiFontSize={8} />
+          </div>
 
           <span className="logo-subtext human-sub">
             human
