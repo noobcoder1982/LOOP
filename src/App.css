@@ -2137,6 +2137,33 @@ body {
   will-change: opacity, background, box-shadow;
 }
 
+.preloader-counter-wrapper {
+  position: absolute;
+  bottom: 8vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  pointer-events: none;
+  font-family: 'Space Mono', monospace;
+  font-weight: 500;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  will-change: opacity, transform;
+}
+
+.preloader-counter-num {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: -0.02em;
+}
+
+.preloader-counter-unit {
+  font-size: 0.62rem;
+  color: #ff2a2a;
+  margin-left: 2px;
+}
+
 /* --- ScrollSmoother base wrappers --- */
 #smooth-wrapper {
   overflow: hidden;

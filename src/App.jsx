@@ -323,6 +323,36 @@ function App() {
       }
     });
 
+    const counterObj = { value: 0 };
+
+    // Fade in the elegant counter
+    mainTl.fromTo('.preloader-counter-wrapper',
+      { opacity: 0, y: 15 },
+      { opacity: 0.45, y: 0, duration: 0.6, ease: 'power2.out' }
+    );
+
+    // Tick count 00 to 100
+    mainTl.to(counterObj, {
+      value: 100,
+      duration: 1.8,
+      ease: 'power2.out',
+      onUpdate: () => {
+        const numNode = document.querySelector('.preloader-counter-num');
+        if (numNode) {
+          const val = Math.floor(counterObj.value);
+          numNode.textContent = val < 10 ? `0${val}` : val;
+        }
+      }
+    });
+
+    // Fade out the counter once finished
+    mainTl.to('.preloader-counter-wrapper', {
+      opacity: 0,
+      y: -10,
+      duration: 0.45,
+      ease: 'power2.in'
+    }, '+=0.1');
+
     // Seam subtly catches light
     mainTl.fromTo('.preloader-seam',
       { opacity: 0.05, background: 'rgba(255, 255, 255, 0.04)', boxShadow: '0 0 0px rgba(255, 255, 255, 0)' },
@@ -1868,6 +1898,10 @@ function App() {
             <div className="preloader-panel-left" />
             <div className="preloader-panel-right" />
             <div className="preloader-seam" />
+            <div className="preloader-counter-wrapper">
+              <span className="preloader-counter-num">00</span>
+              <span className="preloader-counter-unit">%</span>
+            </div>
           </div>
         )}
 
