@@ -32,6 +32,7 @@ const Marquee = () => {
     { name: 'airbnb', color: '#ff5a5f' },
     { name: 'replicate', color: '#00f0ff' }
   ];
+  
 
   // Duplicate list to ensure seamless looping marquee
   const marqueeList = [...companies, ...companies, ...companies];
@@ -382,8 +383,8 @@ function App() {
     );
 
     mainTl.fromTo('.nav-pill',
-      { y: -30, opacity: 0 },
-      { y: 0, opacity: 1, duration: 1.4, ease: 'power3.out', clearProps: "all" },
+      { y: -30, opacity: 0, filter: 'blur(6px)' },
+      { y: 0, opacity: 1, filter: 'blur(0px)', duration: 1.4, ease: 'power3.out' },
       '-=0.8'
     );
 
