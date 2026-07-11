@@ -1721,25 +1721,7 @@ function App() {
   }
 
   return (
-    <div className="app-container" ref={containerRef}>
-      {/* 0. MINIMALIST PRELOADER */}
-      <div className="preloader-container">
-        <div className="preloader-panel-top" />
-        <div className="preloader-panel-bottom" />
-        
-        <div className="preloader-content">
-          <div className="preloader-brand">loop.intelligence</div>
-          <div className="preloader-bar-wrapper">
-            <div className="preloader-bar-bg" />
-            <div className="preloader-bar-progress" />
-          </div>
-          <div className="preloader-counter-container">
-            <span className="preloader-counter">00</span>
-            <span className="preloader-percent">%</span>
-          </div>
-        </div>
-      </div>
-
+    <>
       {/* SaaS Pill Navigation */}
       <nav className={`nav-pill ${activeTab === 'about' ? 'about-active' : ''} ${theme === 'light' ? 'light-mode' : ''}`}>
         {/* Left Brand */}
@@ -1859,8 +1841,27 @@ function App() {
         <span className="hamburger-line" />
       </button>
 
-      <div id="smooth-wrapper">
-        <div id="smooth-content">
+      <div className="app-container" ref={containerRef}>
+        {/* 0. MINIMALIST PRELOADER */}
+        <div className="preloader-container">
+          <div className="preloader-panel-top" />
+          <div className="preloader-panel-bottom" />
+          
+          <div className="preloader-content">
+            <div className="preloader-brand">loop.intelligence</div>
+            <div className="preloader-bar-wrapper">
+              <div className="preloader-bar-bg" />
+              <div className="preloader-bar-progress" />
+            </div>
+            <div className="preloader-counter-container">
+              <span className="preloader-counter">00</span>
+              <span className="preloader-percent">%</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="smooth-wrapper">
+          <div id="smooth-content">
 
           {/* 1. HOME SECTION */}
       <section id="home" className="section-container home-section">
@@ -2248,9 +2249,10 @@ function App() {
           </div>
         </div>
       </footer>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

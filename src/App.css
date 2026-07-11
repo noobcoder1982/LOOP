@@ -61,7 +61,6 @@ body {
   background-color: #000000;
   color: #ffffff;
   font-family: 'Inter', sans-serif;
-  overflow-x: hidden;
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
@@ -72,6 +71,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 /* Nav right group: hint + theme btn + cta */
