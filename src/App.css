@@ -758,7 +758,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 10px;
   cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.marquee-logo-svg {
+  fill: rgba(255, 255, 255, 0.22);
   transition: all 0.3s ease;
 }
 
@@ -771,10 +777,16 @@ body {
   transition: all 0.3s ease;
 }
 
+.marquee-item:hover .marquee-logo-svg {
+  fill: var(--hover-color);
+  filter: drop-shadow(0 0 8px var(--hover-color));
+  transform: scale(1.10);
+}
+
 .marquee-item:hover .marquee-logo-text {
   color: var(--hover-color);
   text-shadow: 0 0 15px var(--hover-color);
-  transform: scale(1.12);
+  transform: scale(1.10);
 }
 
 @keyframes marqueeScroll {
