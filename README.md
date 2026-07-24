@@ -16,11 +16,11 @@
 ---
 
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black&labelColor=0d0d0d)
-![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white&labelColor=0d0d0d)
-![GSAP](https://img.shields.io/badge/GSAP-3-88CE02?style=flat-square&logo=greensock&logoColor=black&labelColor=0d0d0d)
+![Next.js](https://img.shields.io/badge/Next.js-15-white?style=flat-square&logo=nextdotjs&logoColor=white&labelColor=0d0d0d)
+![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?style=flat-square&logo=supabase&logoColor=white&labelColor=0d0d0d)
 ![NVIDIA NIM](https://img.shields.io/badge/NVIDIA-NIM_API-76B900?style=flat-square&logo=nvidia&logoColor=white&labelColor=0d0d0d)
 ![License](https://img.shields.io/badge/license-MIT-white?style=flat-square&labelColor=0d0d0d)
-![Status](https://img.shields.io/badge/phase-1%20%E2%80%94%20early%20access-ff3c3c?style=flat-square&labelColor=0d0d0d)
+![Status](https://img.shields.io/badge/status-production--ready-4ade80?style=flat-square&labelColor=0d0d0d)
 
 </div>
 
@@ -28,41 +28,64 @@
 
 ## `[overview]`
 
-**loop.** is a customer feedback intelligence platform that bridges the gap between human intuition and artificial precision. It ingests product signals, processes them in real-time, and surfaces executive-grade insights through a conversational AI interface — powered by NVIDIA NIM.
-
-> *Where every feedback signal becomes a decision.*
+**loop.** is a premium customer feedback intelligence platform that bridges the gap between human intuition and artificial precision. It ingests product signals, processes them in real-time, scopes them to secure tenant workspaces, and surfaces executive-grade insights through a highly conversational, state-of-the-art AI interface — powered by DeepSeek-V4 on NVIDIA NIM and Supabase.
 
 ---
 
-## `[product]`
+## `[key features & updates]`
 
-| `#` | Feature | Description |
-|-----|---------|-------------|
-| `01` | **real-time signals** | Process and correlate system logs, events, metrics, and user feedback instantly as they stream through your platform |
-| `02` | **conversational context** | Inject state context directly into developers' workspaces. Ask questions and review diagnostics in natural language |
-| `03` | **self-improving feedback** | Loop trace patterns back to optimizing models and APIs. Continuously refine confidence variables automatically |
+The platform has been upgraded to a enterprise-grade SaaS architecture with the following implementation milestones:
+
+| Component | Feature | Details |
+|---|---|---|
+| **AI Intelligence** | **Premium Chat Interface** | A completely redesigned "Ask LOOP" workspace matching Apple, Linear, and Vercel v0 aesthetics. Features landing state suggestions, smooth chat bubbles, and instant context streaming. |
+| **Authentication** | **Multi-Tenant Workspaces** | Complete database migration implementing full workspace isolation. Sign-ups automatically trigger workspace creation (`on_auth_user_created`), making the creator the `ADMIN`. |
+| **Security** | **Granular Role-Based Access (RBAC)** | Support for `ADMIN` (Full controls), `ANALYST` (Ingest & manage), and `VIEWER` (Read-only). Restrictions are enforced database-wide and validated at proxy API route layers. |
+| **Database** | **Non-Recursive RLS Policies** | Security Definer helper functions (`get_user_workspaces`, `is_workspace_admin`) that eliminate PostgreSQL RLS policy loops and provide high-performance row queries. |
+| **Integrations** | **Secure Ingestion Pipeline** | A robust `ingest_feedback` PostgreSQL RPC function enabling external widgets and test clients to write feedback anonymously to the database while enforcing strict tenancy rules. |
+| **Showcase** | **60 FPS Cinematic Demo** | Standalone animated showcase page (`demo.html`) replicating dashboard charts, chat flows, and cursors. Includes a native `getDisplayMedia` 60 FPS recording tool. |
 
 ---
 
-## `[solutions]`
+## `[database schema & tenancy]`
+
+The system enforces tenant isolation natively using PostgreSQL and Supabase Row Level Security (RLS). 
 
 ```
-incident response      →   auto-triage pipeline failures, identify anomalies, compile debug context
-application monitoring →   track trace routes, optimize UI latency, preempt conversion bottlenecks
-model telemetry        →   monitor prompt-response chains, token costs, output safety, prompt drift
+                               ┌───────────────────┐
+                               │       auth.users  │
+                               └─────────┬─────────┘
+                                         │ (Trigger)
+                               ┌─────────▼─────────┐
+                               │     workspaces    │
+                               └─────────┬─────────┘
+                                         │ (1 : N)
+                   ┌─────────────────────┼─────────────────────┐
+                   │                     │                     │
+         ┌─────────▼──────────┐ ┌────────▼─────────┐ ┌─────────▼──────────┐
+         │ workspace_members  │ │     feedback     │ │       themes       │
+         └────────────────────┘ └──────────────────┘ └────────────────────┘
+         (Enforces ADMIN,       (scoped to         (counts & trends
+          ANALYST, VIEWER)       workspace_id)      scoped to workspace)
 ```
+
+### Table Definitions & Triggers:
+1. **`workspaces`**: Represents isolated organizations.
+2. **`workspace_members`**: Bridges `auth.users` to `workspaces` with custom enum roles (`ADMIN`, `ANALYST`, `VIEWER`).
+3. **`on_auth_user_created` (Trigger)**: Automatically spawns a `"Personal Workspace"` and inserts the user as an `ADMIN` immediately upon email signup.
+4. **`get_user_id_by_email` (RPC)**: Securely queries user UUIDs by email without exposing the auth schema, enabling secure dashboard invites.
 
 ---
 
 ## `[stack]`
 
 ```
-frontend     react 19 + vite 8
-animations   gsap 3 + @gsap/react
-ai backend   nvidia nim api  (deepseek-v4-flash / glm-5.2 / gemma-4-31b)
-styling      vanilla css — glassmorphism, scroll-snap, micro-animations
-bundler      vite with proxy rewrite for nvidia integrate api
-linting      oxlint
+frontend      react 19 + vite 8
+backend       next.js 15 (app router api)
+database      supabase postgres + pgsql triggers + security definer functions
+ai engine     nvidia nim api (deepseek-ai/deepseek-v4-flash)
+animations    framer motion + vanilla transitions
+linting       oxlint
 ```
 
 ---
@@ -72,155 +95,74 @@ linting      oxlint
 **prerequisites:** `node >= 18`, `npm >= 9`
 
 ```bash
-# 1. clone
+# 1. Clone the repository
 git clone https://github.com/noobcoder1982/LOOP.git
 cd LOOP
 
-# 2. install dependencies
+# 2. Install dependencies
 npm install
 
-# 3. configure environment
+# 3. Configure environment
 cp .env.example .env
-# → add your NVIDIA NIM API key (see below)
+# -> Populate Supabase credentials and NVIDIA NIM key (see environment)
 
-# 4. start dev server
+# 4. Start local development server
 npm run dev
-
-# 5. open
-# http://localhost:5173
 ```
-
-> For mobile testing on your local network:
-> ```bash
-> npm run dev -- --host
-> ```
 
 ---
 
 ## `[environment]`
 
-Create a `.env` file at the root (already in `.gitignore` — **never commit keys**):
+Ensure the following variables are configured in `.env` for client-side and server-side components:
 
 ```env
+# Supabase connection config
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+
+# AI Engine Key
 VITE_NVIDIA_API_KEY=nvapi-xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-Get your API key at → **[integrate.api.nvidia.com](https://integrate.api.nvidia.com)**
+---
 
-The Vite dev proxy rewrites `/api/nvidia/*` → `https://integrate.api.nvidia.com/v1/*` so no CORS issues in development.
+## `[api endpoints]`
+
+All server-side endpoints forward client auth tokens (`Bearer <JWT>`) dynamically to verify caller identities against Supabase RLS:
+
+- **`GET /api/feedback?userId=<id>`**: Fetch scoped workspace feedback.
+- **`POST /api/feedback/ingest`**: Public/Private endpoint to process and ingest customer signals using secure database procedures.
+- **`PUT /api/feedback`**: Modify feedback properties (requires `ADMIN` or `ANALYST`).
+- **`DELETE /api/feedback`**: Remove a feedback record (requires `ADMIN` or `ANALYST`).
+- **`GET /api/themes?userId=<id>`**: Fetch scoped workspace theme metrics.
 
 ---
 
-## `[scripts]`
+## `[roles & permission matrix]`
 
-| Command | Action |
-|---------|--------|
-| `npm run dev` | Start local dev server at `localhost:5173` |
-| `npm run dev -- --host` | Expose on LAN (for mobile testing) |
-| `npm run build` | Production bundle → `dist/` |
-| `npm run preview` | Preview production build locally |
-| `npm run lint` | Run oxlint static analysis |
-
----
-
-## `[pricing]`
-
-| Plan | Price | Signals | AI Queries |
-|------|-------|---------|------------|
-| **free** | $0 / mo | 2 / month | Basic |
-| **pro** | $29 / mo | Unlimited | Full NIM access |
-| **enterprise** | custom | Unlimited + SLA | Dedicated model |
+| Feature | Admin | Analyst | Viewer | Guest / Widget |
+|---|:---:|:---:|:---:|:---:|
+| Read Workspace Data | ✅ | ✅ | ✅ | ❌ |
+| Submit / Ingest Feedback | ✅ | ✅ | ❌ | ✅ *(via Secure Ingest RPC)* |
+| Update Status / Assign | ✅ | ✅ | ❌ | ❌ |
+| Delete Feedback | ✅ | ✅ | ❌ | ❌ |
+| Invite Members & Update Roles | ✅ | ❌ | ❌ | ❌ |
 
 ---
 
-## `[project structure]`
+## `[cinematic product demo]`
 
-```
-loop/
-├── public/
-│   ├── left_hand.png          ← hero human hand asset
-│   ├── right_hand.png         ← hero artificial hand asset
-│   ├── about_hands.png        ← about section visual
-│   ├── footer_text.png        ← footer typographic asset
-│   ├── pricing_bg.mp4         ← pricing section background video
-│   ├── favicon.svg
-│   └── icons.svg
-├── src/
-│   ├── App.jsx                ← single-file component architecture
-│   ├── App.css                ← full design system (3800+ lines)
-│   ├── main.jsx
-│   └── assets/
-│       └── hero.png
-├── .env                       ← secret keys (gitignored)
-├── .env.example               ← template for contributors
-├── vite.config.js             ← proxy + build config
-└── package.json
-```
+A pre-recorded or interactive cinematic showcase is available. It runs dynamically, simulating dashboard data loads, chat query typing, and report outputs:
 
----
-
-## `[design system]`
-
-The UI is built on a dark-first, minimal aesthetic:
-
-```
-background    #000000 — pure black canvas
-accent-red    #ff3c3c — human signal
-accent-white  #ffffff — artificial signal  
-typography    lowercase, mono-spaced section headers
-layout        scroll-snap full-viewport sections
-animations    gsap timeline — curtain preloader, hand slide-in, logo reveal
-mobile        floating circular hamburger → left-to-right sliding panel menu
-```
-
----
-
-## `[ai integration]`
-
-The embedded LOOP AI agent uses NVIDIA NIM models via a server-side proxied fetch:
-
-```js
-// model options used in this project
-"deepseek-ai/deepseek-v4-flash"   // reasoning + high throughput
-"z-ai/glm-5.2"                    // streaming dialogue
-"google/gemma-4-31b-it"           // thinking-enabled responses
-```
-
-The AI widget lives inside the **Dashboard** view and answers questions about:
-- Latency logs & anomaly analysis
-- Webhook & checkout error patterns
-- Executive product summaries
-- User feedback trend breakdowns
-
----
-
-## `[contributing]`
-
-```bash
-# fork → clone → branch
-git checkout -b feat/your-feature
-
-# make changes, then
-npm run lint
-npm run build   # must pass with 0 errors
-
-# commit with context
-git commit -m "feat: describe your change"
-git push origin feat/your-feature
-# → open a pull request
-```
-
----
-
-## `[roadmap]`
-
-```
-phase 1  ✅  landing site + dashboard shell + AI chat (current)
-phase 2  🔲  backend api — real signal ingestion pipeline
-phase 3  🔲  auth + user workspaces (multi-tenant)
-phase 4  🔲  webhook integrations (stripe, linear, airbnb, replicate)
-phase 5  🔲  self-hosted model telemetry + custom training hooks
-```
+1. Locate the [demo.html](file:///c:/Users/DELL/Desktop/loop/demo.html) file at the root.
+2. Open it in a modern browser (Chrome / Edge recommended).
+3. Click the **⏺ Record** button. It will ask to capture the tab stream.
+4. Let the automation cycle run through its transitions (approx. 2.5 minutes).
+5. Click **⏹ Stop** to trigger an automatic high-quality `.webm` video download.
 
 ---
 
@@ -228,7 +170,6 @@ phase 5  🔲  self-hosted model telemetry + custom training hooks
 
 ```
 MIT License — © 2026 loop.intelligence
-All consoles / Pure telemetry / EST. 2026
 ```
 
 ---
