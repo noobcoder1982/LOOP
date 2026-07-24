@@ -92,73 +92,21 @@ export async function POST(req) {
     // Save to Supabase (if configured)
     let savedData = null;
     if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
-      // Find workspace_id for the user
-      let activeWorkspaceId = null;
-      const { data: member, error: memberError } = await supabase
-        .from('workspace_members')
-        .select('workspace_id, role')
-        .eq('user_id', activeUserId)
-        .maybeSingle();
-
-      if (member) {
-        if (member.role === 'VIEWER') {
-           return NextResponse.json({ error: 'Forbidden: Viewers cannot ingest feedback.' }, { status: 403, headers: corsHeaders });
-        }
-        activeWorkspaceId = member.workspace_id;
-      } else {
-        // Fallback: assign to the first workspace so guest tests don't fail
-        const { data: firstWs } = await supabase
-          .from('workspaces')
-          .select('id')
-          .limit(1)
-          .maybeSingle();
-        if (firstWs) {
-          activeWorkspaceId = firstWs.id;
-        }
-      }
-
-      const { data, error } = await supabase
-        .from('feedback')
-        .insert([
-          {
-            user_id: activeUserId,
-            workspace_id: activeWorkspaceId,
-            text,
-            sentiment,
-            channel: activeChannel,
-            customer: activeCustomer,
-            theme,
-            status: 'NEW'
-          }
-        ])
-        .select();
+      
+      const { data, error } = await supabase.rpc('ingest_feedback', {
+        p_user_id: activeUserId,
+        p_text: text,
+        p_sentiment: sentiment,
+        p_channel: activeChannel,
+        p_customer: activeCustomer,
+        p_theme: theme
+      });
 
       if (error) {
-        console.error('[Supabase Insert Error]:', error);
+        console.error('[Supabase RPC Error]:', error);
         return NextResponse.json({ error: `Database Error: ${error.message}` }, { status: 500, headers: corsHeaders });
       } else {
-        savedData = data?.[0];
-
-        // Increment or insert theme counts scoped to workspace_id
-        if (activeWorkspaceId) {
-          const { data: themeExists } = await supabase
-            .from('themes')
-            .select('id, count')
-            .eq('workspace_id', activeWorkspaceId)
-            .eq('name', theme)
-            .maybeSingle();
-
-          if (themeExists) {
-            await supabase
-              .from('themes')
-              .update({ count: themeExists.count + 1 })
-              .eq('id', themeExists.id);
-          } else {
-            await supabase
-              .from('themes')
-              .insert([{ user_id: activeUserId, workspace_id: activeWorkspaceId, name: theme, count: 1 }]);
-          }
-        }
+        savedData = { id: data.feedback_id, text, sentiment, theme, status: 'NEW' };
       }
     } else {
       return NextResponse.json({ error: 'Database environment variables are missing on the server.' }, { status: 500, headers: corsHeaders });
