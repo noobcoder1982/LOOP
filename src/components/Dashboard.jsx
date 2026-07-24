@@ -162,7 +162,7 @@ function EmptyState({ icon: Icon, title, desc, action, onAction }) {
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard({ setView, signOut }) {
-  const { user, role, workspace } = useAuth();
+  const { user, role, workspace, session } = useAuth();
   const [dashboardTheme, setDashboardTheme] = useState('dark');
   const [activeSettingsTab, setActiveSettingsTab] = useState('General Settings');
   const [activeSidebarTab, setActiveSidebarTab] = useState('Dashboard');
@@ -290,10 +290,11 @@ export default function Dashboard({ setView, signOut }) {
     if (!user) return;
     setLoadingData(true);
     try {
+      const headers = { 'Authorization': `Bearer ${session?.access_token}` };
       const [fbRes, thRes, repRes] = await Promise.all([
-        fetch(`/api/feedback?userId=${user.id}`),
-        fetch(`/api/themes?userId=${user.id}`),
-        fetch(`/api/reports?userId=${user.id}`)
+        fetch(`/api/feedback?userId=${user.id}`, { headers }),
+        fetch(`/api/themes?userId=${user.id}`, { headers }),
+        fetch(`/api/reports?userId=${user.id}`, { headers })
       ]);
       
       const fbData = await fbRes.json();
@@ -368,7 +369,7 @@ export default function Dashboard({ setView, signOut }) {
       const savedKey = localStorage.getItem('loop_nvidia_api_key') || '';
       const response = await fetch('/api/feedback/ingest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           text: simText,
           channel: simChannel,
@@ -403,7 +404,7 @@ export default function Dashboard({ setView, signOut }) {
       const savedKey = localStorage.getItem('loop_nvidia_api_key') || '';
       const response = await fetch('/api/feedback/ingest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           text: manualText,
           channel: manualChannel,
@@ -433,7 +434,7 @@ export default function Dashboard({ setView, signOut }) {
     try {
       const res = await fetch('/api/feedback', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ id, status: newStatus, userId: user.id })
       });
       if (res.status === 403) {
@@ -456,7 +457,8 @@ export default function Dashboard({ setView, signOut }) {
     }
     try {
       const res = await fetch(`/api/feedback?id=${id}&userId=${user.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` }
       });
       if (res.status === 403) {
         alert("Action Forbidden: You do not have permission to perform this task.");

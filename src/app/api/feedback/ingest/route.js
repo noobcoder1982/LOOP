@@ -5,11 +5,6 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
-);
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -22,6 +17,15 @@ export async function OPTIONS() {
 
 export async function POST(req) {
   try {
+    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+    const supabaseOptions = authHeader ? { global: { headers: { Authorization: authHeader } } } : {};
+    
+    const supabase = createClient(
+      supabaseUrl || 'https://placeholder.supabase.co',
+      supabaseAnonKey || 'placeholder-key',
+      supabaseOptions
+    );
+
     const body = await req.json();
     const { text, channel, customer, userId, apiKey } = body;
 

@@ -4,13 +4,19 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
-);
+const getSupabase = (req) => {
+  const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+  const supabaseOptions = authHeader ? { global: { headers: { Authorization: authHeader } } } : {};
+  return createClient(
+    supabaseUrl || 'https://placeholder.supabase.co',
+    supabaseAnonKey || 'placeholder-key',
+    supabaseOptions
+  );
+};
 
 export async function GET(req) {
   try {
+    const supabase = getSupabase(req);
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
 
