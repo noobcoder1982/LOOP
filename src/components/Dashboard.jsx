@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
   LayoutDashboard, 
   Inbox, 
@@ -384,12 +385,18 @@ Recent Feedbacks:
 ${feedbacks.slice(0, 10).map(f => `- [${(f.sentiment || 'unknown').toUpperCase()}] from ${f.customer}: "${f.text}"`).join('\n')}
 
 IMPORTANT RULES: 
-1. You are a TEXT-ONLY assistant.
-2. You CANNOT generate, create, or display charts, graphs, or any visual UI elements. 
-3. NEVER promise to show a graph or chart.
-4. Answer the user's question directly based strictly on the text data above.
+1. You can answer with plain text.
+2. If the user asks for a chart, graph, or visual breakdown of the data, you MUST return a JSON codeblock containing the data exactly like this:
+\`\`\`json:chart
+[
+  {"name": "Positive", "value": 10},
+  {"name": "Negative", "value": 2}
+]
+\`\`\`
+3. Do NOT promise to show graphs unless you include the json:chart codeblock.
+4. Keep plain text answers to 2-3 sentences.
 
-Based on this data, answer the user's question briefly (2-3 sentences max).
+Based on this data, answer the user's question briefly.
 Question: ${targetMsg}`;
 
       const response = await fetch("/api/nvidia/chat/completions", {
@@ -1076,7 +1083,33 @@ Question: ${targetMsg}`;
                             </div>
                           )}
                           <div className={`db-message-bubble ${msg.sender === 'user' ? 'user-bubble' : 'ai-bubble'}`}>
-                            {msg.text.includes('--- Thinking Process ---') ? (() => {
+                            {msg.text.includes('```json:chart') ? (() => {
+                              const parts = msg.text.split('```json:chart');
+                              const beforeText = parts[0].replace('--- Thinking Process ---', '').trim();
+                              const jsonPart = parts[1].split('```')[0].trim();
+                              let chartData = [];
+                              try { chartData = JSON.parse(jsonPart); } catch(e){}
+                              
+                              return (
+                                <div>
+                                  {beforeText && <div className="db-message-text" style={{ marginBottom: 12 }}>{beforeText}</div>}
+                                  {chartData.length > 0 && (
+                                    <div style={{ width: '100%', height: 220, marginTop: 8 }}>
+                                      <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={chartData}>
+                                          <XAxis dataKey="name" stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
+                                          <Tooltip 
+                                            cursor={{fill: 'rgba(255,255,255,0.05)'}} 
+                                            contentStyle={{backgroundColor: '#111', border: '1px solid #333', borderRadius: 4, color: '#fff'}} 
+                                          />
+                                          <Bar dataKey="value" fill="#ff3c3c" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                      </ResponsiveContainer>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })() : msg.text.includes('--- Thinking Process ---') ? (() => {
                               const parts = msg.text.split('--- Response ---');
                               const thinking = parts[0].replace('--- Thinking Process ---', '').trim();
                               const resp = parts[1]?.trim() || '';
