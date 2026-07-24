@@ -1269,6 +1269,34 @@ export default function Dashboard({ setView, signOut }) {
                           Add customer feedback widgets to your website to ingest logs. Copy this tracking script and place it inside the head tags of your site.
                         </p>
 
+                        {/* Workspace ID Block */}
+                        <div className="db-form-group" style={{ marginBottom: '24px' }}>
+                          <label className="db-form-label">Your Workspace ID (User ID)</label>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <input 
+                              type="text" 
+                              readOnly 
+                              value={user?.id || '00000000-0000-0000-0000-000000000000'}
+                              className="db-input"
+                              style={{ flexGrow: 1, cursor: 'text', fontFamily: 'var(--db-font-mono)', fontSize: '0.85rem' }}
+                            />
+                            <button 
+                              type="button" 
+                              className="db-btn-primary"
+                              onClick={() => {
+                                navigator.clipboard.writeText(user?.id || '00000000-0000-0000-0000-000000000000');
+                                alert("Workspace ID copied to clipboard!");
+                              }}
+                              style={{ whiteSpace: 'nowrap' }}
+                            >
+                              Copy ID
+                            </button>
+                          </div>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--db-text-muted)', marginTop: '8px' }}>
+                            Use this ID in API endpoints or external tools to route reviews to your specific dashboard.
+                          </p>
+                        </div>
+
                         {/* Integration instructions snippet */}
                         <div className="db-form-group">
                           <label className="db-form-label">Embeddable Widget HTML Script</label>
