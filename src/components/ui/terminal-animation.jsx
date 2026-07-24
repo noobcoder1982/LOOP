@@ -360,7 +360,7 @@ export function TerminalAnimationDemo() {
                   return null;
                 }
                 return (
-                  <div className="leading-relaxed">
+                  <div key={_i} className="leading-relaxed">
                     <span
                       className={cn(
                         "font-mono text-[10px] md:text-sm",

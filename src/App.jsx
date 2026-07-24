@@ -17,6 +17,7 @@ import { TextPlugin } from "gsap/TextPlugin";
 import { TerminalAnimationDemo } from './components/ui/terminal-animation';
 import ASCIIText from './components/ui/ASCIIText';
 import Dashboard from './components/Dashboard';
+import { useAuth } from './lib/AuthContext.jsx';
 
 import './App.css';
 
@@ -107,6 +108,8 @@ function App() {
   const centerLogoRef = useRef(null);
   const navIndicatorRef = useRef(null);
 
+  const { user, loading: authLoading, signIn, signUp, signOut } = useAuth();
+
   const [activeTab, setActiveTab] = useState('home');
   const [theme, setTheme] = useState('dark');
   const [billingCycle, setBillingCycle] = useState('monthly');
@@ -115,6 +118,21 @@ function App() {
   const [showThemeHint, setShowThemeHint] = useState(true);
   const [showPreloader, setShowPreloader] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Auth form state
+  const [authFullName, setAuthFullName] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoaderActive, setAuthLoaderActive] = useState(false);
+  const [showVerifyPopup, setShowVerifyPopup] = useState(false);
+
+  // If auth session exists, redirect to dashboard
+  useEffect(() => {
+    if (!authLoading && user) {
+      setView('dashboard');
+    }
+  }, [user, authLoading]);
 
   const navItems = ['home', 'product', 'solutions', 'pricing', 'docs', 'about'];
 
@@ -260,6 +278,8 @@ function App() {
 
   // Entrance animations with GSAP (featuring sequenced curtain preloader & blur reveals)
   useGSAP(() => {
+    if (view !== 'landing') return;
+
     // 0. Initialize ScrollSmoother (only on landing page view)
     let smoother;
     if (document.querySelector('#smooth-wrapper')) {
@@ -276,32 +296,41 @@ function App() {
     const logoNode = document.querySelector(".logo-text");
     const logoTarget = logoNode ? new SplitText(logoNode, { type: "chars" }).chars : ".logo-text-ascii-wrapper";
 
-    const splitHuman = new SplitText(".human-desc", {
-      type: "lines,words",
-      linesClass: "text-line multi-word",
-      wordsClass: "word"
-    });
+    const humanDescNode = document.querySelector(".human-desc");
+    const artificialDescNode = document.querySelector(".artificial-desc");
+    
+    let splitHumanWords = [];
+    if (humanDescNode) {
+      const splitHuman = new SplitText(humanDescNode, {
+        type: "lines,words",
+        linesClass: "text-line multi-word",
+        wordsClass: "word"
+      });
+      splitHuman.lines.forEach(line => {
+        if (line.querySelectorAll('.word').length <= 1) {
+          line.classList.remove('multi-word');
+          line.classList.add('single-word');
+        }
+      });
+      splitHumanWords = splitHuman.words;
+    }
 
-    const splitArtificial = new SplitText(".artificial-desc", {
-      type: "lines,words",
-      linesClass: "text-line multi-word",
-      wordsClass: "word"
-    });
+    let splitArtificialWords = [];
+    if (artificialDescNode) {
+      const splitArtificial = new SplitText(artificialDescNode, {
+        type: "lines,words",
+        linesClass: "text-line multi-word",
+        wordsClass: "word"
+      });
+      splitArtificial.lines.forEach(line => {
+        if (line.querySelectorAll('.word').length <= 1) {
+          line.classList.remove('multi-word');
+          line.classList.add('single-word');
+        }
+      });
+      splitArtificialWords = splitArtificial.words;
+    }
 
-    // Custom check: if a split line has only 1 word, make it justify-content: flex-start
-    splitHuman.lines.forEach(line => {
-      if (line.querySelectorAll('.word').length <= 1) {
-        line.classList.remove('multi-word');
-        line.classList.add('single-word');
-      }
-    });
-
-    splitArtificial.lines.forEach(line => {
-      if (line.querySelectorAll('.word').length <= 1) {
-        line.classList.remove('multi-word');
-        line.classList.add('single-word');
-      }
-    });
 
     // Lock scrolling during preloader
     document.body.style.overflow = 'hidden';
@@ -319,90 +348,96 @@ function App() {
     // Each word's .preloader-word-mask starts clipped (height 0) and opens downward
     // revealing the text as if a shutter is pulled away.
 
-    // Start: all word masks fully closed (clipPath height = 0%)
-    gsap.set('.preloader-word-mask', { clipPath: 'inset(0 0 100% 0)' });
-    gsap.set('.preloader-slice', { scaleX: 0, opacity: 0 });
+    const hasPreloader = gsap.utils.toArray('.preloader-word-mask').length > 0;
 
-    // Reveal LOOP X HUMAN with staggered shutter-open (bottom edge of mask rises up)
-    // At t=0.3s
-    mainTl.to('.preloader-word-mask', {
-      clipPath: 'inset(0 0 0% 0)',
-      duration: 0.9,
-      ease: 'expo.inOut',
-      stagger: 0.1
-    }, 0.3);
+    if (hasPreloader) {
+      // Start: all word masks fully closed (clipPath height = 0%)
+      gsap.set('.preloader-word-mask', { clipPath: 'inset(0 0 100% 0)' });
+      gsap.set('.preloader-slice', { scaleX: 0, opacity: 0 });
+
+      // Reveal LOOP X HUMAN with staggered shutter-open (bottom edge of mask rises up)
+      // At t=0.3s
+      mainTl.to('.preloader-word-mask', {
+        clipPath: 'inset(0 0 0% 0)',
+        duration: 0.9,
+        ease: 'expo.inOut',
+        stagger: 0.1
+      }, 0.3);
+    }
 
     // Brief hold after full reveal (timeline position ~1.3s)
 
-    // ── SCENE 2: Slicing lines travel across, destroying X and HUMAN ──
-    // At t=1.3s, horizontal slice lines scan across the type stage
-    const slices = gsap.utils.toArray('.preloader-slice');
-    const stageHeight = 1; // normalized, we space slices across the type area height
+    if (hasPreloader) {
+      // ── SCENE 2: Slicing lines travel across, destroying X and HUMAN ──
+      // At t=1.3s, horizontal slice lines scan across the type stage
+      const slices = gsap.utils.toArray('.preloader-slice');
+      const stageHeight = 1; // normalized, we space slices across the type area height
 
-    // Animate each slice line: it scans from left to right then vanishes
-    slices.forEach((slice, i) => {
-      // Offset slices vertically by setting their top position
-      gsap.set(slice, {
-        top: `${28 + i * 10}%`, // spread across the typography area
-        transformOrigin: 'left center',
+      // Animate each slice line: it scans from left to right then vanishes
+      slices.forEach((slice, i) => {
+        // Offset slices vertically by setting their top position
+        gsap.set(slice, {
+          top: `${28 + i * 10}%`, // spread across the typography area
+          transformOrigin: 'left center',
+        });
+        mainTl.fromTo(slice,
+          { scaleX: 0, opacity: 1 },
+          { scaleX: 1, opacity: 1, duration: 0.22, ease: 'power4.inOut' },
+          1.3 + i * 0.1
+        );
+        // After each slice passes, it fades while cutting through text
+        mainTl.to(slice, {
+          scaleX: 1, opacity: 0, duration: 0.15, ease: 'power2.in'
+        }, 1.3 + i * 0.1 + 0.22);
       });
-      mainTl.fromTo(slice,
-        { scaleX: 0, opacity: 1 },
-        { scaleX: 1, opacity: 1, duration: 0.22, ease: 'power4.inOut' },
-        1.3 + i * 0.1
-      );
-      // After each slice passes, it fades while cutting through text
-      mainTl.to(slice, {
-        scaleX: 1, opacity: 0, duration: 0.15, ease: 'power2.in'
-      }, 1.3 + i * 0.1 + 0.22);
-    });
 
-    // X word: clip it out (masked to 0 height) as slices cut through at t=1.55s
-    mainTl.to('#pl-word-x .preloader-word-mask', {
-      clipPath: 'inset(50% 0 50% 0)',
-      duration: 0.4,
-      ease: 'power4.inOut'
-    }, 1.5);
+      // X word: clip it out (masked to 0 height) as slices cut through at t=1.55s
+      mainTl.to('#pl-word-x .preloader-word-mask', {
+        clipPath: 'inset(50% 0 50% 0)',
+        duration: 0.4,
+        ease: 'power4.inOut'
+      }, 1.5);
 
-    // HUMAN word: collapse via horizontal clip a moment later
-    mainTl.to('#pl-word-human .preloader-word-mask', {
-      clipPath: 'inset(50% 0 50% 0)',
-      duration: 0.45,
-      ease: 'power4.inOut'
-    }, 1.7);
+      // HUMAN word: collapse via horizontal clip a moment later
+      mainTl.to('#pl-word-human .preloader-word-mask', {
+        clipPath: 'inset(50% 0 50% 0)',
+        duration: 0.45,
+        ease: 'power4.inOut'
+      }, 1.7);
 
-    // ── LOOP word recenters itself after X & HUMAN are gone ──
-    // The type-stage has flexbox so LOOP naturally centers when siblings disappear.
-    // We also subtly nudge its position for a breathing-room feel.
-    mainTl.to('#pl-word-loop', {
-      x: 0,
-      duration: 0.6,
-      ease: 'expo.inOut'
-    }, 2.0);
+      // ── LOOP word recenters itself after X & HUMAN are gone ──
+      // The type-stage has flexbox so LOOP naturally centers when siblings disappear.
+      // We also subtly nudge its position for a breathing-room feel.
+      mainTl.to('#pl-word-loop', {
+        x: 0,
+        duration: 0.6,
+        ease: 'expo.inOut'
+      }, 2.0);
 
-    // Brief hold with only LOOP visible (~2.2–3.0s)
+      // Brief hold with only LOOP visible (~2.2–3.0s)
 
-    // ── SCENE 3: Curtain cut middle slice (top / down open) ──
-    // At t=3.1s, the top and bottom panels split open, revealing the site underneath
-    mainTl.to('.preloader-panel-top', {
-      yPercent: -100,
-      duration: 1.2,
-      ease: 'power4.inOut'
-    }, 3.1);
+      // ── SCENE 3: Curtain cut middle slice (top / down open) ──
+      // At t=3.1s, the top and bottom panels split open, revealing the site underneath
+      mainTl.to('.preloader-panel-top', {
+        yPercent: -100,
+        duration: 1.2,
+        ease: 'power4.inOut'
+      }, 3.1);
 
-    mainTl.to('.preloader-panel-bottom', {
-      yPercent: 100,
-      duration: 1.2,
-      ease: 'power4.inOut'
-    }, 3.1);
+      mainTl.to('.preloader-panel-bottom', {
+        yPercent: 100,
+        duration: 1.2,
+        ease: 'power4.inOut'
+      }, 3.1);
 
-    // Simultaneously fade out and scale up the LOOP text smoothly
-    mainTl.to('.preloader-type-stage', {
-      opacity: 0,
-      scale: 1.1,
-      duration: 0.8,
-      ease: 'power3.out'
-    }, 3.1);
+      // Simultaneously fade out and scale up the LOOP text smoothly
+      mainTl.to('.preloader-type-stage', {
+        opacity: 0,
+        scale: 1.1,
+        duration: 0.8,
+        ease: 'power3.out'
+      }, 3.1);
+    }
 
     // 3. Hero Elements Entrance Reveals
     mainTl.fromTo(leftHandRef.current, 
@@ -445,18 +480,21 @@ function App() {
     );
 
     // Blur text reveal for description paragraphs split words
-    mainTl.fromTo([...splitHuman.words, ...splitArtificial.words],
-      { opacity: 0, filter: 'blur(12px)', y: 15 },
-      { 
-        opacity: 0.75, 
-        filter: 'blur(0px)', 
-        y: 0, 
-        duration: 1.2, 
-        stagger: 0.012, 
-        ease: 'power3.out'
-      },
-      '-=1.0'
-    );
+    const wordsToAnimate = [...splitHumanWords, ...splitArtificialWords];
+    if (wordsToAnimate.length > 0) {
+      mainTl.fromTo(wordsToAnimate,
+        { opacity: 0, filter: 'blur(12px)', y: 15 },
+        { 
+          opacity: 0.75, 
+          filter: 'blur(0px)', 
+          y: 0, 
+          duration: 1.2, 
+          stagger: 0.012, 
+          ease: 'power3.out'
+        },
+        '-=1.0'
+      );
+    }
 
     mainTl.fromTo('.nav-pill',
       { y: -30, opacity: 0, filter: 'blur(6px)' },
@@ -506,126 +544,263 @@ function App() {
         }
       );
     });
-  }, { scope: containerRef });
+  }, { scope: containerRef, dependencies: [view] });
 
   if (view === 'dashboard') {
-    return <Dashboard setView={setView} />;
+    return (
+      <div ref={containerRef}>
+        <Dashboard setView={setView} signOut={signOut} />
+      </div>
+    );
   }
+
+  // Auth form submit handler
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthLoaderActive(true);
+
+    try {
+      if (authMode === 'login') {
+        const { error } = await signIn({ email: authEmail, password: authPassword });
+        if (error) {
+          setAuthError(error.message || 'Login failed. Please check your credentials.');
+        }
+        // On success, useEffect above will redirect to dashboard
+      } else {
+        const { data, error } = await signUp({ email: authEmail, password: authPassword, fullName: authFullName });
+        if (error) {
+          setAuthError(error.message || 'Sign up failed. Please try again.');
+        } else {
+          // Show email verification popup
+          setShowVerifyPopup(true);
+        }
+      }
+    } catch (err) {
+      setAuthError('An unexpected error occurred. Please try again.');
+    } finally {
+      setAuthLoaderActive(false);
+    }
+  };
+
 
   if (view === 'auth') {
     return (
-      <div className="auth-container">
-        {/* Glow Effects */}
-        <div className="auth-glow-left" />
-        <div className="auth-glow-right" />
-
-        {/* Minimalist Nav */}
-        <nav className="auth-nav">
-          <div 
-            className="nav-brand" 
-            onClick={() => setView('landing')} 
-            style={{ cursor: 'pointer' }}
-          >
-            <span>loop</span>
-            <span className="nav-brand-dot">.</span>
-          </div>
-          <a 
-            href="#landing" 
-            className="auth-back-link" 
-            onClick={(e) => { e.preventDefault(); setView('landing'); }}
-          >
-            back to site ←
-          </a>
-        </nav>
-
-        {/* Auth Glassmorphic Card */}
-        <div className="auth-card-glass">
-          <div className="auth-header">
-            <span className="auth-brand-logo">
-              loop<span className="auth-logo-dot">.</span>
-            </span>
-            <h2 className="auth-title">
-              {authMode === 'login' ? 'welcome back' : 'create account'}
-            </h2>
-            <p className="auth-subtext">
-              {authMode === 'login' ? 'continue to loop intelligence console' : 'start your 14-day premium console trial'}
-            </p>
-          </div>
-
-          {/* Toggle Switch Tabs */}
-          <div className="auth-mode-selector">
-            <div 
-              className={`auth-mode-btn ${authMode === 'login' ? 'active' : ''}`}
-              onClick={() => setAuthMode('login')}
-            >
-              login
+      <div ref={containerRef} className="auth-split-wrapper">
+        {/* Email Verification Popup Overlay */}
+        {showVerifyPopup && (
+          <div className="auth-verify-overlay">
+            <div className="auth-verify-modal">
+              <div className="auth-verify-icon">✉️</div>
+              <h2 className="auth-verify-title">Check your email</h2>
+              <p className="auth-verify-desc">
+                We&apos;ve sent a verification link to <strong>{authEmail}</strong>.<br />
+                Please verify your email before logging in.
+              </p>
+              <button
+                className="auth-action-submit"
+                onClick={() => {
+                  setShowVerifyPopup(false);
+                  setAuthMode('login');
+                  setAuthPassword('');
+                }}
+              >
+                BACK TO LOGIN ↗
+              </button>
             </div>
+          </div>
+        )}
+
+        {/* Left Hero Showcase Panel */}
+        <div className="auth-left-hero">
+          <div className="auth-hero-glow-top" />
+          <div className="auth-hero-glow-bottom" />
+
+          {/* Header */}
+          <div className="auth-hero-header">
             <div 
-              className={`auth-mode-btn ${authMode === 'signup' ? 'active' : ''}`}
-              onClick={() => setAuthMode('signup')}
+              className="auth-hero-brand"
+              onClick={() => setView('landing')}
+              style={{ cursor: 'pointer' }}
             >
-              sign up
+              loop<span>.</span>
+            </div>
+            <div className="auth-hero-badge">
+              [ CONSOLE v2.6 ]
             </div>
           </div>
 
-          {/* Form */}
-          <form className="auth-form" onSubmit={(e) => e.preventDefault()}>
-            {authMode === 'signup' && (
-              <div className="auth-input-group">
-                <label className="auth-label">name</label>
-                <input 
-                  type="text" 
-                  placeholder="your name" 
-                  className="auth-input" 
-                  required 
-                />
+          {/* Hero Content */}
+          <div className="auth-hero-body">
+            <div className="auth-hero-tagline">
+              <span className="auth-hero-tagline-dot" />
+              Realtime Feedback Telemetry
+            </div>
+
+            <h1 className="auth-hero-title">
+              the continuous <em>intelligence</em> system for product teams.
+            </h1>
+
+            {/* Live Telemetry Ticker Box */}
+            <div className="auth-hero-telemetry-box">
+              <div className="auth-telemetry-item">
+                <span className="auth-telemetry-label">ingestion speed</span>
+                <span className="auth-telemetry-val accent">3.4M/s</span>
+              </div>
+              <div className="auth-telemetry-item">
+                <span className="auth-telemetry-label">uptime sla</span>
+                <span className="auth-telemetry-val">99.99%</span>
+              </div>
+              <div className="auth-telemetry-item">
+                <span className="auth-telemetry-label">drift alerts</span>
+                <span className="auth-telemetry-val">0 active</span>
+              </div>
+            </div>
+
+            {/* Testimonial */}
+            <div className="auth-hero-testimonial">
+              <p className="auth-testimonial-quote">
+                &quot;LOOP completely streamlined how our engineering team triages user feedback into actionable code commits.&quot;
+              </p>
+              <div className="auth-testimonial-author">
+                — Sarah Lin, Lead Systems Architect at Vercel
+              </div>
+            </div>
+          </div>
+
+          {/* Hero Footer */}
+          <div className="auth-hero-footer">
+            &copy; {new Date().getFullYear()} LOOP INTELLIGENCE SYSTEMS INC. ALL RIGHTS RESERVED.
+          </div>
+        </div>
+
+        {/* Right Auth Portal Side */}
+        <div className="auth-right-portal">
+          <nav className="auth-portal-nav">
+            <a 
+              href="#landing" 
+              className="auth-portal-back"
+              onClick={(e) => { e.preventDefault(); setView('landing'); }}
+            >
+              ← return to site
+            </a>
+          </nav>
+
+          <div className="auth-form-card">
+            {/* Header */}
+            <div className="auth-card-header">
+              <div className="auth-card-logo-row">
+                <div className="auth-card-brand">
+                  loop<span>.</span>
+                </div>
+                <div className="auth-status-indicator">
+                  <span className="auth-status-dot" />
+                  LIVE CONSOLE
+                </div>
+              </div>
+
+              <h2 className="auth-card-title">
+                {authMode === 'login' ? 'welcome back' : 'create instance'}
+              </h2>
+              <p className="auth-card-subtitle">
+                {authMode === 'login' 
+                  ? 'enter your credentials to access the intelligence console' 
+                  : 'sign up to start using the LOOP intelligence console'}
+              </p>
+            </div>
+
+            {/* Mode Selector Switcher */}
+            <div className="auth-tabs-row">
+              <button 
+                type="button"
+                className={`auth-tab-btn ${authMode === 'login' ? 'active' : ''}`}
+                onClick={() => { setAuthMode('login'); setAuthError(''); }}
+              >
+                login
+              </button>
+              <button 
+                type="button"
+                className={`auth-tab-btn ${authMode === 'signup' ? 'active' : ''}`}
+                onClick={() => { setAuthMode('signup'); setAuthError(''); }}
+              >
+                sign up
+              </button>
+            </div>
+
+            {/* Error Banner */}
+            {authError && (
+              <div className="auth-error-banner">
+                {authError}
               </div>
             )}
-            <div className="auth-input-group">
-              <label className="auth-label">email address</label>
-              <input 
-                type="email" 
-                placeholder="you@example.com" 
-                className="auth-input" 
-                required 
-              />
-            </div>
-            <div className="auth-input-group">
-              <label className="auth-label">password</label>
-              <input 
-                type="password" 
-                placeholder="••••••••" 
-                className="auth-input" 
-                required 
-              />
-            </div>
 
-            <button type="submit" className="auth-submit-btn" onClick={() => setView('dashboard')}>
-              {authMode === 'login' ? 'login to console' : 'create workspace'}
-            </button>
-          </form>
+            {/* Auth Form */}
+            <form className="auth-input-form" onSubmit={handleAuthSubmit}>
+              {authMode === 'signup' && (
+                <div className="auth-field">
+                  <label className="auth-field-label">Full Name</label>
+                  <div className="auth-field-input-wrap">
+                    <input 
+                      type="text" 
+                      placeholder="Alex Mercer" 
+                      className="auth-field-input" 
+                      required 
+                      value={authFullName}
+                      onChange={e => setAuthFullName(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
 
-          {/* Divider */}
-          <div className="auth-divider">
-            <span className="auth-divider-line" />
-            <span className="auth-divider-text">or continue with</span>
-            <span className="auth-divider-line" />
-          </div>
+              <div className="auth-field">
+                <label className="auth-field-label">Work Email</label>
+                <div className="auth-field-input-wrap">
+                  <input 
+                    type="email" 
+                    placeholder="alex@company.com" 
+                    className="auth-field-input" 
+                    required 
+                    value={authEmail}
+                    onChange={e => setAuthEmail(e.target.value)}
+                  />
+                </div>
+              </div>
 
-          {/* Social Row */}
-          <div className="auth-social-row">
-            <button className="auth-social-btn" onClick={() => setView('dashboard')}>
-              <svg className="auth-social-icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-              </svg>
-              guest login
-            </button>
-            <button className="auth-social-btn" onClick={() => {}}>
-              <svg className="auth-social-icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.51 0-6.36-2.85-6.36-6.36 0-3.51 2.85-6.36 6.36-6.36 1.63 0 3.117.618 4.256 1.63L21.2 4.4C19.06 2.378 16.035 1.143 12.24 1.143 6.25 1.143 1.4 6 1.4 12s4.85 10.857 10.84 10.857c5.96 0 10.663-4.234 10.663-10.857 0-.713-.083-1.393-.245-1.715H12.24z" />
-              </svg>
-              google
-            </button>
+              <div className="auth-field">
+                <label className="auth-field-label">Password</label>
+                <div className="auth-field-input-wrap">
+                  <input 
+                    type="password" 
+                    placeholder="••••••••••••" 
+                    className="auth-field-input" 
+                    required 
+                    value={authPassword}
+                    onChange={e => setAuthPassword(e.target.value)}
+                    minLength={6}
+                  />
+                </div>
+              </div>
+
+              {authMode === 'login' && (
+                <div className="auth-form-options">
+                  <label className="auth-checkbox-label">
+                    <input type="checkbox" defaultChecked style={{ accentColor: '#ff3c3c' }} />
+                    <span>Remember instance</span>
+                  </label>
+                  <a href="#forgot" className="auth-forgot-link" onClick={(e) => e.preventDefault()}>
+                    forgot password?
+                  </a>
+                </div>
+              )}
+
+              <button type="submit" className="auth-action-submit" disabled={authLoaderActive}>
+                {authLoaderActive
+                  ? 'Processing...'
+                  : authMode === 'login'
+                    ? 'LOGIN TO CONSOLE ↗'
+                    : 'CREATE INSTANCE ↗'}
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -633,7 +808,8 @@ function App() {
   }
 
   return (
-    <>
+    <div ref={containerRef}>
+
       {/* SaaS Pill Navigation */}
       <nav className={`nav-pill ${activeTab === 'about' ? 'about-active' : ''} ${theme === 'light' ? 'light-mode' : ''}`}>
         {/* Left Brand */}
@@ -752,7 +928,7 @@ function App() {
         <span className="hamburger-line" />
       </button>
 
-      <div className="app-container" ref={containerRef}>
+      <div className="app-container">
         {/* 0. CINEMATIC PRELOADER */}
         {showPreloader && (
           <div className="preloader-container">
@@ -1185,7 +1361,7 @@ function App() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
