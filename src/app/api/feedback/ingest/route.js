@@ -10,13 +10,23 @@ const supabase = createClient(
   supabaseAnonKey || 'placeholder-key'
 );
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(req) {
   try {
     const body = await req.json();
     const { text, channel, customer, userId, apiKey } = body;
 
     if (!text) {
-      return NextResponse.json({ error: 'Feedback text is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Feedback text is required' }, { status: 400, headers: corsHeaders });
     }
 
     // Default to guest/simulated user id if not provided (so users can test instantly)
@@ -131,8 +141,8 @@ export async function POST(req) {
         status: 'NEW',
         date: new Date().toISOString()
       }
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500, headers: corsHeaders });
   }
 }
