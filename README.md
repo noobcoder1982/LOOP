@@ -1,13 +1,7 @@
 <div align="center">
 
-```
-██╗      ██████╗  ██████╗ ██████╗ 
-██║     ██╔═══██╗██╔═══██╗██╔══██╗
-██║     ██║   ██║██║   ██║██████╔╝
-██║     ██║   ██║██║   ██║██╔═══╝ 
-███████╗╚██████╔╝╚██████╔╝██║     
-╚══════╝ ╚═════╝  ╚═════╝ ╚═╝     
-```
+<img src="./public/hero_banner.png" alt="LOOP Banner" width="100%" />
+
 
 **`artificial · human`**
 
@@ -44,6 +38,22 @@ The platform has been upgraded to a enterprise-grade SaaS architecture with the 
 | **Database** | **Non-Recursive RLS Policies** | Security Definer helper functions (`get_user_workspaces`, `is_workspace_admin`) that eliminate PostgreSQL RLS policy loops and provide high-performance row queries. |
 | **Integrations** | **Secure Ingestion Pipeline** | A robust `ingest_feedback` PostgreSQL RPC function enabling external widgets and test clients to write feedback anonymously to the database while enforcing strict tenancy rules. |
 | **Showcase** | **60 FPS Cinematic Demo** | Standalone animated showcase page (`demo.html`) replicating dashboard charts, chat flows, and cursors. Includes a native `getDisplayMedia` 60 FPS recording tool. |
+
+---
+
+## `[interface preview]`
+
+### 📊 Real-Time Tenancy Dashboard
+<img src="./public/screenshot_dashboard.png" alt="Real-Time Dashboard" width="100%" />
+
+### ✉️ Scoped Feedback Inbox
+<img src="./public/screenshot_inbox.png" alt="Feedback Inbox" width="100%" />
+
+### 💬 Premium Ask LOOP AI Assistant
+<img src="./public/screenshot_ask_loop.png" alt="Ask LOOP" width="100%" />
+
+### ⚙️ Widget Integrations & Client SDK
+<img src="./public/screenshot_settings.png" alt="Settings & SDK" width="100%" />
 
 ---
 
