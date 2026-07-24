@@ -383,6 +383,12 @@ Here is the current workspace data context:
 Recent Feedbacks:
 ${feedbacks.slice(0, 10).map(f => `- [${(f.sentiment || 'unknown').toUpperCase()}] from ${f.customer}: "${f.text}"`).join('\n')}
 
+IMPORTANT RULES: 
+1. You are a TEXT-ONLY assistant.
+2. You CANNOT generate, create, or display charts, graphs, or any visual UI elements. 
+3. NEVER promise to show a graph or chart.
+4. Answer the user's question directly based strictly on the text data above.
+
 Based on this data, answer the user's question briefly (2-3 sentences max).
 Question: ${targetMsg}`;
 
