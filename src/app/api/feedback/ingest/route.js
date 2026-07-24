@@ -96,11 +96,14 @@ export async function POST(req) {
       let activeWorkspaceId = null;
       const { data: member, error: memberError } = await supabase
         .from('workspace_members')
-        .select('workspace_id')
+        .select('workspace_id, role')
         .eq('user_id', activeUserId)
         .maybeSingle();
 
       if (member) {
+        if (member.role === 'VIEWER') {
+           return NextResponse.json({ error: 'Forbidden: Viewers cannot ingest feedback.' }, { status: 403, headers: corsHeaders });
+        }
         activeWorkspaceId = member.workspace_id;
       } else {
         // Fallback: assign to the first workspace so guest tests don't fail
