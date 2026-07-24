@@ -12,13 +12,30 @@ const supabase = createClient(
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId') || '00000000-0000-0000-0000-000000000000';
+    const userId = searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing userId parameter' }, { status: 400 });
+    }
 
     if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
+      // 1. Fetch user's workspace
+      const { data: member, error: memberError } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (memberError) throw memberError;
+      if (!member) {
+        return NextResponse.json({ themes: [] }); // User has no workspace
+      }
+
+      // 2. Fetch themes scoped to workspace
       const { data, error } = await supabase
         .from('themes')
         .select('*')
-        .eq('user_id', userId)
+        .eq('workspace_id', member.workspace_id)
         .order('count', { ascending: false });
 
       if (error) throw error;

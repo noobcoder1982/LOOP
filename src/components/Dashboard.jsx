@@ -41,6 +41,7 @@ import {
   Mic
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext.jsx';
+import { supabase } from '../lib/supabase';
 import './Dashboard.css';
 
 // ─── Model Settings Modal ───────────────────────────────────────────────────
@@ -161,7 +162,7 @@ function EmptyState({ icon: Icon, title, desc, action, onAction }) {
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard({ setView, signOut }) {
-  const { user } = useAuth();
+  const { user, role, workspace } = useAuth();
   const [dashboardTheme, setDashboardTheme] = useState('dark');
   const [activeSettingsTab, setActiveSettingsTab] = useState('General Settings');
   const [activeSidebarTab, setActiveSidebarTab] = useState('Dashboard');
@@ -178,6 +179,87 @@ export default function Dashboard({ setView, signOut }) {
   const [themes, setThemes] = useState([]);
   const [reports, setReports] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
+
+  // Workspace Members States
+  const [workspaceMembers, setWorkspaceMembers] = useState([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('ANALYST');
+  const [inviteLoading, setInviteLoading] = useState(false);
+
+  const fetchWorkspaceMembers = async () => {
+    if (!workspace || !workspace.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('workspace_members')
+        .select('id, user_id, role, user_email, created_at')
+        .eq('workspace_id', workspace.id);
+      if (data) setWorkspaceMembers(data);
+    } catch (e) {
+      console.error("Failed to load workspace members:", e);
+    }
+  };
+
+  const handleUpdateMemberRole = async (memberId, newRole) => {
+    if (role !== 'ADMIN') {
+      alert("Forbidden: Only ADMINs can manage member roles.");
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('workspace_members')
+        .update({ role: newRole })
+        .eq('id', memberId);
+      if (error) throw error;
+      await fetchWorkspaceMembers();
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Failed to update role.");
+    }
+  };
+
+  const handleAddMember = async (e) => {
+    e.preventDefault();
+    if (role !== 'ADMIN') {
+      alert("Forbidden: Only ADMINs can add workspace members.");
+      return;
+    }
+    if (!inviteEmail.trim() || inviteLoading) return;
+    setInviteLoading(true);
+
+    try {
+      // 1.securely lookup user id from email
+      const { data: inviteeId, error: rpcError } = await supabase.rpc('get_user_id_by_email', { email_addr: inviteEmail });
+
+      if (rpcError || !inviteeId) {
+        alert("User not found. Ensure they have signed up first.");
+        setInviteLoading(false);
+        return;
+      }
+
+      // 2. add to workspace_members
+      const { error: insertError } = await supabase
+        .from('workspace_members')
+        .insert({
+          workspace_id: workspace.id,
+          user_id: inviteeId,
+          role: inviteRole,
+          user_email: inviteEmail
+        });
+
+      if (insertError) {
+        alert(insertError.message || "Failed to add member to workspace.");
+      } else {
+        alert("Member added successfully!");
+        setInviteEmail('');
+        await fetchWorkspaceMembers();
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error adding workspace member.");
+    } finally {
+      setInviteLoading(false);
+    }
+  };
 
   // Ingestion Simulator States
   const [simName, setSimName] = useState('Alex Rivera');
@@ -232,6 +314,12 @@ export default function Dashboard({ setView, signOut }) {
     fetchWorkspaceData();
   }, [user]);
 
+  useEffect(() => {
+    if (activeSidebarTab === 'Settings' && activeSettingsTab === 'Workspace Members') {
+      fetchWorkspaceMembers();
+    }
+  }, [activeSidebarTab, activeSettingsTab, workspace]);
+
   // Derive user display info from Supabase session
   const userEmail = user?.email || 'user@loop.intel';
   const userFullName = user?.user_metadata?.full_name || userEmail.split('@')[0];
@@ -268,6 +356,10 @@ export default function Dashboard({ setView, signOut }) {
   // ── Ingest Sim Handlers ────────────────────────────────────────────────────
   const handleSimSubmit = async (e) => {
     e.preventDefault();
+    if (role === 'VIEWER') {
+      alert("Forbidden: Viewers cannot ingest feedback.");
+      return;
+    }
     if (!simText.trim() || simLoading) return;
     setSimLoading(true);
     setSimSuccess(false);
@@ -302,6 +394,10 @@ export default function Dashboard({ setView, signOut }) {
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
+    if (role === 'VIEWER') {
+      alert("Forbidden: Viewers cannot ingest feedback.");
+      return;
+    }
     if (!manualText.trim()) return;
     try {
       const savedKey = localStorage.getItem('loop_nvidia_api_key') || '';
@@ -330,12 +426,20 @@ export default function Dashboard({ setView, signOut }) {
 
   // ── Update Feedback Status ──────────────────────────────────────────────────
   const handleUpdateStatus = async (id, newStatus) => {
+    if (role === 'VIEWER') {
+      alert("Forbidden: Viewers cannot modify feedback.");
+      return;
+    }
     try {
       const res = await fetch('/api/feedback', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: newStatus })
+        body: JSON.stringify({ id, status: newStatus, userId: user.id })
       });
+      if (res.status === 403) {
+        alert("Action Forbidden: You do not have permission to perform this task.");
+        return;
+      }
       if (res.ok) {
         setFeedbacks(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
       }
@@ -346,10 +450,18 @@ export default function Dashboard({ setView, signOut }) {
 
   // ── Delete Feedback Item ────────────────────────────────────────────────────
   const handleDeleteFeedback = async (id) => {
+    if (role === 'VIEWER') {
+      alert("Forbidden: Viewers cannot delete feedback.");
+      return;
+    }
     try {
-      const res = await fetch(`/api/feedback?id=${id}`, {
+      const res = await fetch(`/api/feedback?id=${id}&userId=${user.id}`, {
         method: 'DELETE'
       });
+      if (res.status === 403) {
+        alert("Action Forbidden: You do not have permission to perform this task.");
+        return;
+      }
       if (res.ok) {
         setFeedbacks(prev => prev.filter(f => f.id !== id));
         if (selectedFeedbackIndex >= feedbacks.length - 1 && selectedFeedbackIndex > 0) {
@@ -1335,13 +1447,13 @@ Question: ${targetMsg}`;
 
                   <div className="db-settings-layout">
                     <nav className="db-settings-nav">
-                      {['General Settings', 'Theme & Appearance', 'Widget Integration & SDK', 'AI Model'].map((item) => (
+                      {['General Settings', 'Theme & Appearance', 'Widget Integration & SDK', 'AI Model', 'Workspace Members'].map((item) => (
                         <div 
-                          key={item} 
-                          className={`db-settings-nav-item${activeSettingsTab === item ? ' active' : ''}`}
-                          onClick={() => setActiveSettingsTab(item)}
+                           key={item} 
+                           className={`db-settings-nav-item${activeSettingsTab === item ? ' active' : ''}`}
+                           onClick={() => setActiveSettingsTab(item)}
                         >
-                          {item}
+                           {item}
                         </div>
                       ))}
                     </nav>
@@ -1519,6 +1631,101 @@ Content-Type: application/json
                             API key configured — AI Classifier Active
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {activeSettingsTab === 'Workspace Members' && (
+                      <div className="db-settings-panel">
+                        <div className="db-settings-section-title">Teammates & Role Configuration</div>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--db-text-muted)', marginBottom: '18px', lineHeight: 1.5 }}>
+                          Manage workspace membership and edit permissions. Roles: ADMIN (Full access), ANALYST (Ingest & manage data), VIEWER (Read-only access).
+                        </p>
+
+                        {/* Invite Member form (Admins only) */}
+                        {role === 'ADMIN' ? (
+                          <form onSubmit={handleAddMember} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px', padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--db-border)', borderRadius: 'var(--db-radius-sm)' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--db-text-primary)' }}>Invite Teammate</div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <input 
+                                type="email" 
+                                className="db-input" 
+                                placeholder="teammate@company.com" 
+                                value={inviteEmail}
+                                onChange={e => setInviteEmail(e.target.value)}
+                                style={{ flex: 1 }}
+                                required
+                              />
+                              <select 
+                                className="db-input" 
+                                value={inviteRole}
+                                onChange={e => setInviteRole(e.target.value)}
+                                style={{ width: '120px' }}
+                              >
+                                <option value="ANALYST">ANALYST</option>
+                                <option value="VIEWER">VIEWER</option>
+                                <option value="ADMIN">ADMIN</option>
+                              </select>
+                              <button type="submit" className="db-btn db-btn-primary" disabled={inviteLoading}>
+                                <UserPlus size={14} /> Add
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <div style={{ padding: '12px', background: 'rgba(255, 60, 60, 0.05)', border: '1px solid rgba(255, 60, 60, 0.15)', borderRadius: '8px', color: 'var(--db-text-muted)', fontSize: '0.75rem', marginBottom: '24px' }}>
+                            Only Workspace ADMINs can manage members or roles.
+                          </div>
+                        )}
+
+                        {/* Members List Table */}
+                        <div style={{ overflowX: 'auto' }}>
+                          <table className="db-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr>
+                                <th style={{ textAlign: 'left', padding: '10px' }}>Email</th>
+                                <th style={{ textAlign: 'left', padding: '10px' }}>Role</th>
+                                <th style={{ textAlign: 'left', padding: '10px' }}>Joined At</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {workspaceMembers.length === 0 ? (
+                                <tr>
+                                  <td colSpan="3" style={{ textAlign: 'center', padding: '20px', color: 'var(--db-text-muted)', fontSize: '0.8rem' }}>
+                                    No members found.
+                                  </td>
+                                </tr>
+                              ) : (
+                                workspaceMembers.map((m) => (
+                                  <tr key={m.id} style={{ borderBottom: '1px solid var(--db-border-light)' }}>
+                                    <td style={{ padding: '10px', fontSize: '0.8rem', color: 'var(--db-text-primary)' }}>
+                                      {m.user_email || 'invited-user@loop.intel'} {m.user_id === user.id && <span style={{ fontSize: '0.7rem', color: '#ff3c3c', background: 'rgba(255, 60, 60, 0.1)', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>You</span>}
+                                    </td>
+                                    <td style={{ padding: '10px' }}>
+                                      {role === 'ADMIN' && m.user_id !== user.id ? (
+                                        <select 
+                                          className="db-input"
+                                          value={m.role}
+                                          onChange={(e) => handleUpdateMemberRole(m.id, e.target.value)}
+                                          style={{ width: '110px', padding: '4px 8px', fontSize: '0.75rem' }}
+                                        >
+                                          <option value="VIEWER">VIEWER</option>
+                                          <option value="ANALYST">ANALYST</option>
+                                          <option value="ADMIN">ADMIN</option>
+                                        </select>
+                                      ) : (
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: m.role === 'ADMIN' ? '#ff3c3c' : m.role === 'ANALYST' ? '#3b82f6' : '#94a3b8' }}>
+                                          {m.role}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '10px', fontSize: '0.75rem', color: 'var(--db-text-muted)' }}>
+                                      {new Date(m.created_at).toLocaleDateString()}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </div>

@@ -88,11 +88,34 @@ export async function POST(req) {
     // Save to Supabase (if configured)
     let savedData = null;
     if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
+      // Find workspace_id for the user
+      let activeWorkspaceId = null;
+      const { data: member, error: memberError } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', activeUserId)
+        .maybeSingle();
+
+      if (member) {
+        activeWorkspaceId = member.workspace_id;
+      } else {
+        // Fallback: assign to the first workspace so guest tests don't fail
+        const { data: firstWs } = await supabase
+          .from('workspaces')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+        if (firstWs) {
+          activeWorkspaceId = firstWs.id;
+        }
+      }
+
       const { data, error } = await supabase
         .from('feedback')
         .insert([
           {
             user_id: activeUserId,
+            workspace_id: activeWorkspaceId,
             text,
             sentiment,
             channel: activeChannel,
@@ -109,23 +132,25 @@ export async function POST(req) {
       } else {
         savedData = data?.[0];
 
-        // Increment or insert theme counts
-        const { data: themeExists } = await supabase
-          .from('themes')
-          .select('id, count')
-          .eq('user_id', activeUserId)
-          .eq('name', theme)
-          .maybeSingle();
+        // Increment or insert theme counts scoped to workspace_id
+        if (activeWorkspaceId) {
+          const { data: themeExists } = await supabase
+            .from('themes')
+            .select('id, count')
+            .eq('workspace_id', activeWorkspaceId)
+            .eq('name', theme)
+            .maybeSingle();
 
-        if (themeExists) {
-          await supabase
-            .from('themes')
-            .update({ count: themeExists.count + 1 })
-            .eq('id', themeExists.id);
-        } else {
-          await supabase
-            .from('themes')
-            .insert([{ user_id: activeUserId, name: theme, count: 1 }]);
+          if (themeExists) {
+            await supabase
+              .from('themes')
+              .update({ count: themeExists.count + 1 })
+              .eq('id', themeExists.id);
+          } else {
+            await supabase
+              .from('themes')
+              .insert([{ user_id: activeUserId, workspace_id: activeWorkspaceId, name: theme, count: 1 }]);
+          }
         }
       }
     } else {

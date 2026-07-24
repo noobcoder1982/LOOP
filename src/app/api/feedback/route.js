@@ -12,13 +12,30 @@ const supabase = createClient(
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId') || '00000000-0000-0000-0000-000000000000';
+    const userId = searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing userId parameter' }, { status: 400 });
+    }
 
     if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
+      // 1. Fetch user's workspace
+      const { data: member, error: memberError } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (memberError) throw memberError;
+      if (!member) {
+        return NextResponse.json({ feedback: [] }); // User has no workspace
+      }
+
+      // 2. Fetch feedback scoped to workspace
       const { data, error } = await supabase
         .from('feedback')
         .select('*')
-        .eq('user_id', userId)
+        .eq('workspace_id', member.workspace_id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -34,13 +51,25 @@ export async function GET(req) {
 export async function PUT(req) {
   try {
     const body = await req.json();
-    const { id, status } = body;
+    const { id, status, userId } = body;
 
-    if (!id || !status) {
-      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    if (!id || !status || !userId) {
+      return NextResponse.json({ error: 'Missing parameters (id, status, or userId)' }, { status: 400 });
     }
 
     if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
+      // Role enforcement
+      const { data: member, error: memberError } = await supabase
+        .from('workspace_members')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (memberError) throw memberError;
+      if (!member || member.role === 'VIEWER') {
+        return NextResponse.json({ error: 'Forbidden: Viewers cannot modify feedback' }, { status: 403 });
+      }
+
       const { data, error } = await supabase
         .from('feedback')
         .update({ status })
@@ -61,12 +90,25 @@ export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const userId = searchParams.get('userId');
 
-    if (!id) {
-      return NextResponse.json({ error: 'Missing id parameter' }, { status: 400 });
+    if (!id || !userId) {
+      return NextResponse.json({ error: 'Missing id or userId parameters' }, { status: 400 });
     }
 
     if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
+      // Role enforcement
+      const { data: member, error: memberError } = await supabase
+        .from('workspace_members')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (memberError) throw memberError;
+      if (!member || member.role === 'VIEWER') {
+        return NextResponse.json({ error: 'Forbidden: Viewers cannot delete feedback' }, { status: 403 });
+      }
+
       const { error } = await supabase
         .from('feedback')
         .delete()
