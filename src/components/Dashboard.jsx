@@ -1202,43 +1202,48 @@ Question: ${targetMsg}`;
                               </motion.div>
                             )}
                           </div>
-                          {msg.sender === 'user' && (
-                            <div className="db-message-avatar user-avatar">
-                              <User size={12} />
-                            </div>
-                          )}
                         </div>
-                      ))}
-                      {isSendingChat && (
-                        <div className="db-message-row ai-row">
-                          <div className="db-message-avatar ai-avatar"><Sparkles size={12} /></div>
-                          <div className="db-message-bubble ai-bubble typing-indicator">
-                            <span></span><span></span><span></span>
+
+                        <div className="db-chat-premium-composer-area">
+                          <div className="db-premium-composer sticky-composer">
+                            <textarea 
+                              className="db-premium-textarea"
+                              placeholder="Ask LOOP anything..."
+                              value={chatInput}
+                              onChange={(e) => {
+                                setChatInput(e.target.value);
+                                e.target.style.height = 'auto';
+                                e.target.style.height = (e.target.scrollHeight) + 'px';
+                              }}
+                              onKeyDown={(e) => { 
+                                if(e.key === 'Enter' && !e.shiftKey) { 
+                                  e.preventDefault(); 
+                                  handleSendChat(); 
+                                } 
+                              }}
+                              rows={1}
+                            />
+                            <div className="db-premium-composer-footer">
+                              <div className="db-premium-composer-actions-left">
+                                <button className="db-premium-icon-btn"><Paperclip size={16} /></button>
+                                <button className="db-premium-icon-btn"><Mic size={16} /></button>
+                              </div>
+                              <button 
+                                className={`db-premium-send-btn ${chatInput.trim() ? 'active' : ''}`}
+                                onClick={() => handleSendChat()}
+                                disabled={!chatInput.trim() || isSendingChat}
+                              >
+                                <ArrowUpRight size={16} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="db-premium-composer-hint">
+                            AI responses can make mistakes. Verify important data.
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="db-chat-input-wrapper">
-                    <div className="db-chat-input-box">
-                      <input
-                        type="text"
-                        className="db-chat-input"
-                        placeholder="Ask LOOP AI anything..."
-                        value={chatInput}
-                        onChange={e => setChatInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleSendChat()}
-                        disabled={isSendingChat}
-                      />
-                      <button className="db-chat-submit" onClick={() => handleSendChat()} disabled={isSendingChat || !chatInput.trim()}>
-                        <Send size={16} />
-                      </button>
-                    </div>
-                    <div className="db-chat-input-footer">
-                      LOOP AI can make mistakes. Consider verifying important metrics.
-                    </div>
-                  </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
 
