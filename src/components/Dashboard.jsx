@@ -32,15 +32,26 @@ import {
   ChevronLeft,
   ChevronRight,
   Key,
-  Zap
+  Zap,
+  Code
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext.jsx';
 import './Dashboard.css';
 
 // ─── Model Settings Modal ───────────────────────────────────────────────────
 function ModelModal({ onClose }) {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('loop_nvidia_api_key') || '');
-  const [model, setModel] = useState(() => localStorage.getItem('loop_model') || 'deepseek-ai/deepseek-v4-flash');
+  const [apiKey, setApiKey] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('loop_nvidia_api_key') || '';
+    }
+    return '';
+  });
+  const [model, setModel] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('loop_model') || 'deepseek-ai/deepseek-v4-flash';
+    }
+    return 'deepseek-ai/deepseek-v4-flash';
+  });
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
@@ -58,7 +69,6 @@ function ModelModal({ onClose }) {
     { id: 'deepseek-ai/deepseek-r1', label: 'DeepSeek R1' },
     { id: 'meta/llama-3.1-70b-instruct', label: 'Meta Llama 3.1 70B' },
     { id: 'mistralai/mistral-large-2-instruct', label: 'Mistral Large 2' },
-    { id: 'nvidia/nemotron-4-340b-instruct', label: 'Nvidia Nemotron 4 340B' },
   ];
 
   return (
@@ -147,11 +157,8 @@ function EmptyState({ icon: Icon, title, desc, action, onAction }) {
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard({ setView, signOut }) {
   const { user } = useAuth();
-  const [dashboardTheme, setDashboardTheme] = useState(() => {
-    return localStorage.getItem('loop_dashboard_theme') || 'dark';
-  });
+  const [dashboardTheme, setDashboardTheme] = useState('dark');
   const [activeSettingsTab, setActiveSettingsTab] = useState('General Settings');
-  const [dashboardState, setDashboardState] = useState('data');
   const [activeSidebarTab, setActiveSidebarTab] = useState('Dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -162,6 +169,65 @@ export default function Dashboard({ setView, signOut }) {
   const [chatInput, setChatInput] = useState('');
   const [isSendingChat, setIsSendingChat] = useState(false);
   const [themeSearchQuery, setThemeSearchQuery] = useState('');
+
+  // Real Database States
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [themes, setThemes] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  // Ingestion Simulator States
+  const [simName, setSimName] = useState('Alex Rivera');
+  const [simChannel, setSimChannel] = useState('Website Widget');
+  const [simText, setSimText] = useState('This product has dramatically accelerated our feedback cycle!');
+  const [simLoading, setSimLoading] = useState(false);
+  const [simSuccess, setSimSuccess] = useState(false);
+
+  // Manual Ingestion Modal/States
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualText, setManualText] = useState('');
+  const [manualName, setManualName] = useState('');
+  const [manualChannel, setManualChannel] = useState('Direct Form');
+
+  // Selected feedback index
+  const [selectedFeedbackIndex, setSelectedFeedbackIndex] = useState(0);
+  const [replySent, setReplySent] = useState(false);
+  const [copiedDraft, setCopiedDraft] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setDashboardTheme(localStorage.getItem('loop_dashboard_theme') || 'dark');
+    }
+  }, []);
+
+  // Fetch from database API
+  const fetchWorkspaceData = async () => {
+    if (!user) return;
+    setLoadingData(true);
+    try {
+      const [fbRes, thRes, repRes] = await Promise.all([
+        fetch(`/api/feedback?userId=${user.id}`),
+        fetch(`/api/themes?userId=${user.id}`),
+        fetch(`/api/reports?userId=${user.id}`)
+      ]);
+      
+      const fbData = await fbRes.json();
+      const thData = await thRes.json();
+      const repData = await repRes.json();
+
+      setFeedbacks(fbData.feedback || []);
+      setThemes(thData.themes || []);
+      setReports(repData.reports || []);
+    } catch (e) {
+      console.error("Failed to load workspace metrics:", e);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWorkspaceData();
+  }, [user]);
 
   // Derive user display info from Supabase session
   const userEmail = user?.email || 'user@loop.intel';
@@ -183,7 +249,9 @@ export default function Dashboard({ setView, signOut }) {
 
   const handleThemeChange = (newThemeKey) => {
     setDashboardTheme(newThemeKey);
-    localStorage.setItem('loop_dashboard_theme', newThemeKey);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('loop_dashboard_theme', newThemeKey);
+    }
   };
 
   const sidebarTabs = [
@@ -197,59 +265,140 @@ export default function Dashboard({ setView, signOut }) {
     { name: 'Settings', icon: Settings }
   ];
 
-  // ── Chat handler with real NVIDIA NIM API ──────────────────────────────────
+  // ── Ingest Sim Handlers ────────────────────────────────────────────────────
+  const handleSimSubmit = async (e) => {
+    e.preventDefault();
+    if (!simText.trim() || simLoading) return;
+    setSimLoading(true);
+    setSimSuccess(false);
+
+    try {
+      const savedKey = localStorage.getItem('loop_nvidia_api_key') || '';
+      const response = await fetch('/api/feedback/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: simText,
+          channel: simChannel,
+          customer: simName,
+          userId: user.id,
+          apiKey: savedKey
+        })
+      });
+
+      if (response.ok) {
+        setSimSuccess(true);
+        setSimText('');
+        // Reload dashboard
+        await fetchWorkspaceData();
+        setTimeout(() => setSimSuccess(false), 2500);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSimLoading(false);
+    }
+  };
+
+  const handleManualSubmit = async (e) => {
+    e.preventDefault();
+    if (!manualText.trim()) return;
+    try {
+      const savedKey = localStorage.getItem('loop_nvidia_api_key') || '';
+      const response = await fetch('/api/feedback/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: manualText,
+          channel: manualChannel,
+          customer: manualName || 'Direct Upload',
+          userId: user.id,
+          apiKey: savedKey
+        })
+      });
+
+      if (response.ok) {
+        setManualText('');
+        setManualName('');
+        setShowManualModal(false);
+        await fetchWorkspaceData();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // ── Update Feedback Status ──────────────────────────────────────────────────
+  const handleUpdateStatus = async (id, newStatus) => {
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus })
+      });
+      if (res.ok) {
+        setFeedbacks(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // ── Delete Feedback Item ────────────────────────────────────────────────────
+  const handleDeleteFeedback = async (id) => {
+    try {
+      const res = await fetch(`/api/feedback?id=${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setFeedbacks(prev => prev.filter(f => f.id !== id));
+        if (selectedFeedbackIndex >= feedbacks.length - 1 && selectedFeedbackIndex > 0) {
+          setSelectedFeedbackIndex(selectedFeedbackIndex - 1);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // ── Chat handler with server API completions proxy ───────────────────────
   const handleSendChat = async (directMsgInput = null) => {
     const targetMsg = directMsgInput || chatInput;
     if (!targetMsg.trim() || isSendingChat) return;
-
-    const savedKey = localStorage.getItem('loop_nvidia_api_key') || import.meta.env.VITE_NVIDIA_API_KEY;
-    const savedModel = localStorage.getItem('loop_model') || 'deepseek-ai/deepseek-v4-flash';
 
     setChatInput('');
     setChatMessages(prev => [...prev, { sender: 'user', text: targetMsg }]);
     setIsSendingChat(true);
     setChatMessages(prev => [...prev, { sender: 'ai', text: 'Thinking...' }]);
 
-    if (!savedKey) {
-      setTimeout(() => {
-        setChatMessages(prev => {
-          const u = [...prev];
-          u[u.length - 1] = { sender: 'ai', text: 'No API key configured. Please click the ⚡ Model Settings button and add your NVIDIA NIM API key to enable AI responses.' };
-          return u;
-        });
-        setIsSendingChat(false);
-      }, 600);
-      return;
-    }
-
     try {
+      const savedKey = localStorage.getItem('loop_nvidia_api_key') || '';
+      const savedModel = localStorage.getItem('loop_model') || 'deepseek-ai/deepseek-v4-flash';
+
       const response = await fetch("/api/nvidia/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${savedKey}`,
-          "Accept": "application/json"
+          "Authorization": `Bearer ${savedKey}`
         },
         body: JSON.stringify({
           model: savedModel,
-          messages: [{ role: "user", content: `You are LOOP AI, an executive customer feedback assistant. Explain briefly (2-3 sentences max). Question: ${targetMsg}` }],
-          temperature: 1, top_p: 0.95, max_tokens: 1024,
-          stream: false
+          messages: [{ role: "user", content: `You are LOOP AI, an executive customer feedback assistant. Explain briefly (2-3 sentences max). Question: ${targetMsg}` }]
         })
       });
 
-      const rawText = await response.text();
+      const data = await response.json();
       let aiText = '';
-      try {
-        const data = JSON.parse(rawText);
+      if (data.error) {
+        aiText = data.error;
+      } else {
         const reasoning = data.choices?.[0]?.message?.reasoning || '';
         const content = data.choices?.[0]?.message?.content || '';
         aiText = reasoning
           ? `--- Thinking Process ---\n${reasoning}\n--- Response ---\n${content}`
           : content;
-      } catch (e) { aiText = rawText; }
+      }
 
-      if (!aiText) throw new Error('No response content from model');
       setChatMessages(prev => {
         const u = [...prev];
         u[u.length - 1] = { sender: 'ai', text: aiText };
@@ -258,7 +407,7 @@ export default function Dashboard({ setView, signOut }) {
     } catch (error) {
       setChatMessages(prev => {
         const u = [...prev];
-        u[u.length - 1] = { sender: 'ai', text: 'Unable to reach the AI model. Please verify your API key in Model Settings and try again.' };
+        u[u.length - 1] = { sender: 'ai', text: 'Unable to reach the AI model. Check your API settings.' };
         return u;
       });
     } finally {
@@ -266,14 +415,33 @@ export default function Dashboard({ setView, signOut }) {
     }
   };
 
-  // ── Handle sign out ────────────────────────────────────────────────────────
+  // Calculate stats from real feedbacks
+  const totalFeedbackCount = feedbacks.length;
+  const positiveFeedbacks = feedbacks.filter(f => f.sentiment === 'positive');
+  const negativeFeedbacks = feedbacks.filter(f => f.sentiment === 'negative');
+  const neutralFeedbacks = feedbacks.filter(f => f.sentiment === 'neutral');
+
+  const positivePercent = totalFeedbackCount > 0 ? Math.round((positiveFeedbacks.length / totalFeedbackCount) * 100) : 0;
+  const negativePercent = totalFeedbackCount > 0 ? Math.round((negativeFeedbacks.length / totalFeedbackCount) * 100) : 0;
+  const neutralPercent = totalFeedbackCount > 0 ? Math.round((neutralFeedbacks.length / totalFeedbackCount) * 100) : 0;
+
+  // Group by channel
+  const channelsMap = feedbacks.reduce((acc, f) => {
+    acc[f.channel] = (acc[f.channel] || 0) + 1;
+    return acc;
+  }, {});
+
   const handleSignOut = async () => {
     await signOut();
     setView('landing');
   };
 
-  // ─── Today's date display ──────────────────────────────────────────────────
   const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  // Filter themes
+  const filteredThemes = themes.filter(t =>
+    t.name.toLowerCase().includes(themeSearchQuery.toLowerCase())
+  );
 
   return (
     <div className="db-root" data-dashboard-theme={dashboardTheme}>
@@ -281,10 +449,60 @@ export default function Dashboard({ setView, signOut }) {
       {/* ═══════════════ MODEL MODAL ═══════════════ */}
       {showModelModal && <ModelModal onClose={() => setShowModelModal(false)} />}
 
+      {/* ═══════════════ MANUAL ENTRY MODAL ═══════════════ */}
+      {showManualModal && (
+        <div className="model-modal-overlay" onClick={e => e.target === e.currentTarget && setShowManualModal(false)}>
+          <div className="model-modal">
+            <div className="model-modal-header">
+              <h2 className="model-modal-title">Add Feedback Log</h2>
+              <button className="model-modal-close" onClick={() => setShowManualModal(false)}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleManualSubmit} className="model-modal-body">
+              <div className="db-form-group">
+                <label className="db-form-label">Customer Name</label>
+                <input 
+                  type="text" 
+                  className="db-input" 
+                  placeholder="e.g. Alex Mercer"
+                  value={manualName}
+                  onChange={e => setManualName(e.target.value)}
+                />
+              </div>
+              <div className="db-form-group">
+                <label className="db-form-label">Channel Source</label>
+                <select 
+                  className="db-input"
+                  value={manualChannel}
+                  onChange={e => setManualChannel(e.target.value)}
+                >
+                  <option value="Direct Form">Direct Form</option>
+                  <option value="Email Support">Email Support</option>
+                  <option value="Intercom Log">Intercom Log</option>
+                  <option value="Zendesk ticket">Zendesk ticket</option>
+                </select>
+              </div>
+              <div className="db-form-group">
+                <label className="db-form-label">Feedback Comments</label>
+                <textarea 
+                  className="db-input" 
+                  rows={4}
+                  required
+                  placeholder="Write customer feedback..."
+                  value={manualText}
+                  onChange={e => setManualText(e.target.value)}
+                  style={{ resize: 'none', background: 'transparent' }}
+                />
+              </div>
+              <button type="submit" className="db-btn db-btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                Ingest & Classify Feedback ↗
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ═══════════════ SIDEBAR ═══════════════ */}
       <aside className={`db-sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
-
-        {/* Floating expand tab — visible only when collapsed */}
         <button
           className="db-sidebar-expand-tab"
           onClick={() => setSidebarCollapsed(false)}
@@ -293,46 +511,28 @@ export default function Dashboard({ setView, signOut }) {
           <ChevronRight size={10} />
         </button>
 
-        {/* Brand Row */}
         <div className="db-sidebar-brand">
           {!sidebarCollapsed && (
             <span className="db-sidebar-logo">LOOP<span style={{color: '#ff3c3c'}}>.</span></span>
           )}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'rgba(255,255,255,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              padding: '4px',
-              borderRadius: '6px',
-              transition: 'color 200ms ease, background 200ms ease',
-            }}
+            className="db-sidebar-toggle-btn"
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            onMouseEnter={e => { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.08)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color='rgba(255,255,255,0.5)'; e.currentTarget.style.background='none'; }}
           >
-            {sidebarCollapsed
-              ? <ChevronRight size={16} />
-              : <ChevronLeft size={16} />
-            }
+            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
         </div>
 
-        {/* Workspace Card */}
         <div className="db-sidebar-ws-card">
           <div className="db-sidebar-ws-icon"><LayoutDashboard size={14} color="#ff3c3c" /></div>
           <div className="db-sidebar-ws-info">
             <div className="db-sidebar-ws-name">{userFullName}</div>
-            <div className="db-sidebar-ws-sub">Personal Workspace</div>
+            <div className="db-sidebar-ws-sub">Personal Console</div>
           </div>
           <ChevronDown size={14} className="db-sidebar-ws-chevron" />
         </div>
 
-        {/* Nav */}
         <nav className="db-nav">
           {sidebarTabs.map(tab => {
             const Icon = tab.icon;
@@ -347,59 +547,30 @@ export default function Dashboard({ setView, signOut }) {
               >
                 <Icon className="db-nav-icon" size={16} />
                 <span className="db-nav-label">{tab.name}</span>
+                {tab.name === 'Feedback Inbox' && totalFeedbackCount > 0 && (
+                  <span className="db-nav-badge">{totalFeedbackCount}</span>
+                )}
               </button>
             );
           })}
         </nav>
 
-        {/* Quick Actions */}
         <div className="db-sidebar-section">
           <div className="db-sidebar-section-title">Quick Actions</div>
-          <button className="db-sidebar-action"><Plus size={14} /> Add Feedback</button>
-          <button className="db-sidebar-action"><Upload size={14} /> Upload CSV</button>
-          <button className="db-sidebar-action" style={{ color: '#ff3c3c' }}><Sparkles size={14} /> Ask LOOP</button>
+          <button className="db-sidebar-action" onClick={() => setShowManualModal(true)}><Plus size={14} /> Add Feedback</button>
+          <button className="db-sidebar-action" onClick={() => { setActiveSidebarTab('Settings'); setActiveSettingsTab('Widget Integration & SDK'); }}><Code size={14} /> Embed Widget</button>
+          <button className="db-sidebar-action" style={{ color: '#ff3c3c' }} onClick={() => setActiveSidebarTab('Ask LOOP')}><Sparkles size={14} /> Ask LOOP</button>
         </div>
 
-        {/* Sign Out */}
         <div className="db-sidebar-signout">
-          <button className="db-sidebar-action" style={{ color: 'rgba(255,255,255,0.4)' }} onClick={handleSignOut}>
+          <button className="db-sidebar-action" style={{ color: 'rgba(255,255,255,0.4)', paddingLeft: '0px' }} onClick={handleSignOut}>
             <LogOut size={14} /> Sign Out
           </button>
         </div>
       </aside>
 
-      {/* ═══════════════ MOBILE OVERLAY ═══════════════ */}
-      {mobileMenuOpen && (
-        <div className="db-mobile-overlay">
-          <div className="db-mobile-overlay-header">
-            <span className="db-sidebar-logo">loop<span>.</span></span>
-            <button style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }} onClick={() => setMobileMenuOpen(false)}>
-              <X size={20} />
-            </button>
-          </div>
-          <div className="db-mobile-overlay-nav">
-            {sidebarTabs.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeSidebarTab === tab.name;
-              return (
-                <button
-                  key={tab.name}
-                  className={`db-nav-item${isActive ? ' active' : ''}`}
-                  style={{ width: '100%', padding: '12px 14px' }}
-                  onClick={() => { setActiveSidebarTab(tab.name); setMobileMenuOpen(false); }}
-                >
-                  <Icon className="db-nav-icon" size={16} />
-                  <span className="db-nav-label">{tab.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* ═══════════════ MAIN CONTENT ═══════════════ */}
       <main className="db-main">
-
         {/* Top Bar */}
         <header className="db-topbar">
           <div className="db-topbar-left">
@@ -415,7 +586,6 @@ export default function Dashboard({ setView, signOut }) {
             </div>
           </div>
           <div className="db-topbar-right">
-            {/* Model Settings button */}
             <button
               className="db-topbar-icon-btn model-settings-btn"
               title="AI Model Settings"
@@ -438,70 +608,53 @@ export default function Dashboard({ setView, signOut }) {
         {/* Content Area */}
         <div className="db-content">
 
-          {/* ── Skeleton Loading ── */}
-          {dashboardState === 'loading' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div className="db-kpi-grid">
-                {[1,2,3,4].map(i => (
-                  <div key={i} className="db-kpi-card">
-                    <div className="db-skeleton" style={{ width: '80px', height: '10px', marginBottom: '12px' }} />
-                    <div className="db-skeleton" style={{ width: '120px', height: '28px' }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* ── Normal Data Views ── */}
-          {dashboardState !== 'loading' && (
+          {!loadingData && (
             <>
-
               {/* ╔══════════════════════════════════════╗
                   ║  TAB: DASHBOARD OVERVIEW             ║
                   ╚══════════════════════════════════════╝ */}
               {activeSidebarTab === 'Dashboard' && (
                 <div className="db-overview-layout">
-                  
                   {/* Header Row */}
                   <div className="db-overview-header">
                     <div>
-                      <h1 className="db-overview-title">Welcome, {userFullName} 👋</h1>
-                      <p className="db-overview-subtitle">Your workspace is ready. Start by adding feedback or uploading a CSV.</p>
+                      <h1 className="db-overview-title">Welcome back, {userFullName} 👋</h1>
+                      <p className="db-overview-subtitle">Reviewing real-time feedback telemetries from customer instances.</p>
                     </div>
                     <div className="db-overview-date">
                       {today} <div className="db-overview-date-icon"><LayoutDashboard size={14} /></div>
                     </div>
                   </div>
 
-                  {/* Model Setup Prompt if no key */}
+                  {/* AI Status configuration guide */}
                   {!localStorage.getItem('loop_nvidia_api_key') && (
                     <div className="db-setup-banner" onClick={() => setShowModelModal(true)}>
                       <Zap size={16} color="#ff3c3c" />
-                      <span>Set up your NVIDIA API key to activate the LOOP AI assistant</span>
+                      <span>Set up your NVIDIA API key to activate real-time LLM sentiment & theme categorization</span>
                       <span className="db-setup-banner-cta">Configure →</span>
                     </div>
                   )}
 
                   {/* Actions Ribbon */}
                   <div className="db-actions-ribbon">
-                    <button className="db-btn db-btn-primary"><Plus size={14} /> Add Feedback</button>
-                    <button className="db-btn db-btn-outline"><Upload size={14} /> Upload CSV</button>
+                    <button className="db-btn db-btn-primary" onClick={() => setShowManualModal(true)}><Plus size={14} /> Add Feedback</button>
+                    <button className="db-btn db-btn-outline" onClick={() => { setActiveSidebarTab('Settings'); setActiveSettingsTab('Widget Integration & SDK'); }}><Code size={14} /> SDK Guide</button>
                     <button className="db-btn db-btn-outline" style={{color: '#ff3c3c', borderColor: 'rgba(255,60,60,0.3)'}}
                       onClick={() => setActiveSidebarTab('Ask LOOP')}>
                       <Sparkles size={14} /> Ask LOOP
                     </button>
-                    <button className="db-btn db-btn-outline"><FileText size={14} /> Generate Report</button>
                   </div>
 
-                  {/* KPI Grid — all zeros until real data */}
+                  {/* KPI Grid */}
                   <div className="db-kpi-grid">
                     {[
-                      { label: 'Total Feedback', value: '0', icon: MessageSquare, iconColor: '#ff3c3c' },
-                      { label: 'New This Week', value: '0', icon: BarChart3, iconColor: '#ff3c3c' },
-                      { label: 'Negative Sentiment', value: '—', icon: AlertTriangle, iconColor: '#ff3c3c' },
-                      { label: 'Positive Sentiment', value: '—', icon: Brain, iconColor: '#10b981' },
-                      { label: 'Active Themes', value: '0', icon: Tag, iconColor: '#ff3c3c' },
-                      { label: 'Reports Generated', value: '0', icon: FileText, iconColor: '#ffb020' }
+                      { label: 'Total Ingested', value: totalFeedbackCount, icon: MessageSquare, iconColor: '#ff3c3c' },
+                      { label: 'Negative Sentiment', value: totalFeedbackCount > 0 ? `${negativePercent}%` : '—', icon: AlertTriangle, iconColor: '#ff3c3c' },
+                      { label: 'Positive Sentiment', value: totalFeedbackCount > 0 ? `${positivePercent}%` : '—', icon: Brain, iconColor: '#10b981' },
+                      { label: 'Neutral Sentiment', value: totalFeedbackCount > 0 ? `${neutralPercent}%` : '—', icon: Tag, iconColor: '#ffb020' },
+                      { label: 'Active Themes', value: themes.length, icon: Tag, iconColor: '#ff3c3c' },
+                      { label: 'Reports Active', value: reports.length, icon: FileText, iconColor: '#ffb020' }
                     ].map(kpi => {
                       const Icon = kpi.icon;
                       return (
@@ -512,89 +665,161 @@ export default function Dashboard({ setView, signOut }) {
                           <div className="db-kpi-body">
                             <span className="db-kpi-value">{kpi.value}</span>
                           </div>
-                          <div className="db-kpi-footer">no data yet</div>
+                          <div className="db-kpi-footer">telemetry stats</div>
                         </div>
                       );
                     })}
                   </div>
 
-                  {/* Charts Row — Empty States */}
-                  <div className="db-charts-grid">
-                    {/* Line Chart Empty */}
-                    <div className="db-chart-card line-chart">
-                      <div className="db-chart-header">
-                        <div className="db-chart-title"><BarChart3 size={14} color="#ff3c3c" /> Feedback Volume Over Time</div>
+                  {/* Charts & Graphs Section */}
+                  {totalFeedbackCount > 0 ? (
+                    <div className="db-charts-grid">
+                      {/* Sentiment distribution donut chart */}
+                      <div className="db-chart-card donut-chart">
+                        <div className="db-chart-title">Sentiment Distribution</div>
+                        <div className="db-donut-layout">
+                          <div className="db-donut-svg-wrap">
+                            <svg viewBox="0 0 36 36" className="db-donut-svg">
+                              <circle cx="18" cy="18" r="15.915" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
+                              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#10b981" strokeWidth="4" strokeDasharray={`${positivePercent} ${100 - positivePercent}`} strokeDashoffset="25" />
+                              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#ff3c3c" strokeWidth="4" strokeDasharray={`${negativePercent} ${100 - negativePercent}`} strokeDashoffset={`${25 - positivePercent}`} />
+                              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#6b7280" strokeWidth="4" strokeDasharray={`${neutralPercent} ${100 - neutralPercent}`} strokeDashoffset={`${25 - positivePercent - negativePercent}`} />
+                            </svg>
+                            <div className="db-donut-center">
+                              <div className="db-donut-val">{totalFeedbackCount}</div>
+                              <div className="db-donut-lbl">Signals</div>
+                            </div>
+                          </div>
+                          <div className="db-donut-legend">
+                            <div className="db-legend-row"><span className="db-dot" style={{background: '#10b981'}}/> Positive <span className="db-pct">{positivePercent}%</span></div>
+                            <div className="db-legend-row"><span className="db-dot" style={{background: '#6b7280'}}/> Neutral <span className="db-pct">{neutralPercent}%</span></div>
+                            <div className="db-legend-row"><span className="db-dot" style={{background: '#ff3c3c'}}/> Negative <span className="db-pct">{negativePercent}%</span></div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="db-chart-body" style={{position: 'relative', height: '180px'}}>
+
+                      {/* Ingestion channels donut chart */}
+                      <div className="db-chart-card donut-chart">
+                        <div className="db-chart-title">Channels Ingest Distribution</div>
+                        <div className="db-donut-layout">
+                          <div className="db-donut-svg-wrap">
+                            <svg viewBox="0 0 36 36" className="db-donut-svg">
+                              <circle cx="18" cy="18" r="15.915" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
+                              {Object.entries(channelsMap).map(([chan, count], idx) => {
+                                const pct = Math.round((count / totalFeedbackCount) * 100);
+                                const strokeColor = idx === 0 ? '#ff3c3c' : idx === 1 ? '#f97316' : idx === 2 ? '#3b82f6' : '#6b7280';
+                                return (
+                                  <circle key={chan} cx="18" cy="18" r="15.915" fill="none" stroke={strokeColor} strokeWidth="4" strokeDasharray={`${pct} ${100 - pct}`} strokeDashoffset={25} />
+                                );
+                              })}
+                            </svg>
+                            <div className="db-donut-center">
+                              <div className="db-donut-val">{totalFeedbackCount}</div>
+                              <div className="db-donut-lbl">Signals</div>
+                            </div>
+                          </div>
+                          <div className="db-donut-legend">
+                            {Object.entries(channelsMap).map(([chan, count], idx) => (
+                              <div key={chan} className="db-legend-row">
+                                <span className="db-dot" style={{background: idx === 0 ? '#ff3c3c' : idx === 1 ? '#f97316' : idx === 2 ? '#3b82f6' : '#6b7280'}}/>
+                                {chan} <span className="db-pct">{Math.round((count / totalFeedbackCount) * 100)}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="db-charts-grid">
+                      <div className="db-chart-card line-chart" style={{ gridColumn: '1 / -1' }}>
+                        <div className="db-chart-title"><BarChart3 size={14} color="#ff3c3c" /> Workspace Dashboard Overview</div>
                         <EmptyState
-                          icon={BarChart3}
-                          title="No feedback data yet"
-                          desc="Add your first feedback to see the volume chart."
+                          icon={Inbox}
+                          title="No feedback collected yet"
+                          desc="Use the quick simulator tool below or set up the Website Widget SDK on your site to ingest feedback instantly."
+                          action="Setup Widget SDK"
+                          onAction={() => { setActiveSidebarTab('Settings'); setActiveSettingsTab('Widget Integration & SDK'); }}
                         />
                       </div>
                     </div>
+                  )}
 
-                    {/* Donut Chart Empty */}
-                    <div className="db-chart-card donut-chart">
-                      <div className="db-chart-title">Sentiment Distribution</div>
-                      <EmptyState
-                        icon={Brain}
-                        title="No sentiment data"
-                        desc="Sentiment analysis will appear once feedback is ingested."
-                      />
-                    </div>
-
-                    {/* Channel Chart Empty */}
-                    <div className="db-chart-card donut-chart">
-                      <div className="db-chart-title">Feedback by Channel</div>
-                      <EmptyState
-                        icon={Tag}
-                        title="No channel data"
-                        desc="Connect a channel to see distribution."
-                      />
-                    </div>
-                  </div>
-
-                  {/* Data Grid Row — all empty */}
+                  {/* Simulator + Top Themes Tables Row */}
                   <div className="db-overview-data-row">
-                    
+                    {/* Live simulator widget */}
+                    <div className="db-data-card" style={{ flex: 1.5 }}>
+                      <div className="db-data-header">
+                        <div className="db-data-title">
+                          <Zap size={14} color="#ff3c3c" style={{ marginRight: '6px' }} />
+                          Feedback Ingestion Simulator
+                        </div>
+                      </div>
+                      <form onSubmit={handleSimSubmit} className="db-input-form" style={{ marginTop: '12px' }}>
+                        <div className="db-form-group">
+                          <label className="db-form-label">Simulated Name</label>
+                          <input 
+                            type="text" 
+                            className="db-input" 
+                            value={simName}
+                            onChange={e => setSimName(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="db-form-group">
+                          <label className="db-form-label">Ingestion Channel</label>
+                          <select 
+                            className="db-input" 
+                            value={simChannel}
+                            onChange={e => setSimChannel(e.target.value)}
+                          >
+                            <option value="Website Widget">Website Widget</option>
+                            <option value="Email Support">Email Support</option>
+                            <option value="Slack Integration">Slack Integration</option>
+                            <option value="Zendesk ticket">Zendesk ticket</option>
+                          </select>
+                        </div>
+                        <div className="db-form-group">
+                          <label className="db-form-label">Review/Feedback Text</label>
+                          <textarea 
+                            className="db-input" 
+                            rows={3}
+                            value={simText}
+                            onChange={e => setSimText(e.target.value)}
+                            placeholder="Type feedback here (e.g., 'Your pricing page is very confusing and expensive.')"
+                            required
+                            style={{ resize: 'none', background: 'transparent' }}
+                          />
+                        </div>
+                        <button type="submit" className="db-btn db-btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={simLoading}>
+                          {simLoading ? 'Simulating...' : simSuccess ? 'Feedback Ingested ✓' : 'Send Test Feedback Signal ⚡'}
+                        </button>
+                      </form>
+                    </div>
+
                     {/* Top Themes */}
-                    <div className="db-data-card">
+                    <div className="db-data-card" style={{ flex: 1 }}>
                       <div className="db-data-header">
-                        <div className="db-data-title">Top Themes</div>
+                        <div className="db-data-title">Classified Themes</div>
                       </div>
-                      <EmptyState
-                        icon={Tag}
-                        title="No themes detected"
-                        desc="Themes will be automatically detected as feedback is added."
-                      />
-                    </div>
-
-                    {/* Recent Feedback */}
-                    <div className="db-data-card">
-                      <div className="db-data-header">
-                        <div className="db-data-title">Recent Feedback</div>
-                      </div>
-                      <EmptyState
-                        icon={Inbox}
-                        title="No feedback yet"
-                        desc="Add feedback via the button above or upload a CSV file."
-                        action="+ Add Feedback"
-                        onAction={() => {}}
-                      />
-                    </div>
-
-                    {/* AI Insight — disabled until data */}
-                    <div className="db-data-card db-insight-card">
-                      <div className="db-insight-header">
-                        <Sparkles size={14} color="#ff3c3c"/> AI Insight
-                      </div>
-                      <div className="db-insight-body" style={{ opacity: 0.5 }}>
-                        AI insights will appear here once feedback data is ingested and analyzed.
-                      </div>
-                      <button className="db-btn-insight" onClick={() => setActiveSidebarTab('Ask LOOP')}>
-                        Ask LOOP AI
-                      </button>
+                      {themes.length > 0 ? (
+                        <table className="db-data-table" style={{ marginTop: '12px' }}>
+                          <thead><tr><th>Theme Class</th><th>Count</th></tr></thead>
+                          <tbody>
+                            {themes.map(t => (
+                              <tr key={t.id}>
+                                <td>{t.name}</td>
+                                <td>{t.count}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <EmptyState
+                          icon={Tag}
+                          title="No themes classified"
+                          desc="AI automatically tags themes from customer review text."
+                        />
+                      )}
                     </div>
                   </div>
 
@@ -613,25 +838,82 @@ export default function Dashboard({ setView, signOut }) {
                     </div>
                   </div>
 
-                  <div className="db-inbox-layout">
-                    <div className="db-inbox-list">
-                      <div className="db-inbox-list-header">Streams (0)</div>
-                      <EmptyState
-                        icon={Inbox}
-                        title="Empty inbox"
-                        desc="No feedback signals received yet. Add feedback or connect a data source."
-                        action="+ Add Feedback"
-                        onAction={() => {}}
-                      />
-                    </div>
-                    <div className="db-inbox-detail">
-                      <div className="db-inbox-detail-header">
-                        <div className="db-inbox-detail-meta" style={{ color: 'var(--db-text-muted)', fontSize: '0.82rem' }}>
-                          Select a feedback item from the inbox to view details.
+                  {feedbacks.length > 0 ? (
+                    <div className="db-inbox-layout">
+                      {/* Inbox List */}
+                      <div className="db-inbox-list">
+                        <div className="db-inbox-list-header">Streams ({feedbacks.length})</div>
+                        {feedbacks.map((item, idx) => (
+                          <div
+                            key={item.id}
+                            className={`db-inbox-item${selectedFeedbackIndex === idx ? ' active' : ''}`}
+                            onClick={() => { setSelectedFeedbackIndex(idx); setReplySent(false); setCopiedDraft(false); }}
+                          >
+                            <div className="db-inbox-item-header">
+                              <span className="db-inbox-customer">{item.customer}</span>
+                              <span className={`db-badge db-badge-${item.sentiment || 'neutral'}`}>
+                                {item.sentiment}
+                              </span>
+                            </div>
+                            <p className="db-inbox-preview">{item.text}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Inbox Detail */}
+                      <div className="db-inbox-detail">
+                        <div className="db-inbox-detail-header">
+                          <div className="db-inbox-detail-meta">
+                            <span className="db-inbox-detail-name">{feedbacks[selectedFeedbackIndex]?.customer}</span>
+                            <span className="db-badge db-badge-channel">{feedbacks[selectedFeedbackIndex]?.channel}</span>
+                            <span className={`db-badge status-${feedbacks[selectedFeedbackIndex]?.status || 'NEW'}`}>
+                              {feedbacks[selectedFeedbackIndex]?.status || 'NEW'}
+                            </span>
+                            <span className="db-inbox-detail-date">Ingested: {new Date(feedbacks[selectedFeedbackIndex]?.created_at).toLocaleString()}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                            <select 
+                              className="db-input" 
+                              style={{ width: '120px', height: '30px', padding: '0 8px', fontSize: '0.72rem' }}
+                              value={feedbacks[selectedFeedbackIndex]?.status || 'NEW'}
+                              onChange={e => handleUpdateStatus(feedbacks[selectedFeedbackIndex]?.id, e.target.value)}
+                            >
+                              <option value="NEW">New</option>
+                              <option value="REVIEWED">Reviewed</option>
+                              <option value="ACTIONED">Actioned</option>
+                            </select>
+                            <button className="db-btn db-btn-secondary" style={{ height: '30px', color: '#ff3c3c' }} onClick={() => handleDeleteFeedback(feedbacks[selectedFeedbackIndex]?.id)}>
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                        <div className="db-inbox-detail-body">
+                          <div className="db-inbox-signal-label">Review Comment</div>
+                          <p className="db-inbox-signal-text" style={{ fontSize: '0.9rem', lineHeight: '1.6' }}>{feedbacks[selectedFeedbackIndex]?.text}</p>
+                        </div>
+
+                        <div className="db-inbox-ai-card">
+                          <div className="db-inbox-ai-header">
+                            <Sparkles size={12} />
+                            AI Response Draft Generator
+                          </div>
+                          <div className="db-inbox-ai-body">
+                            <p className="db-inbox-ai-text" style={{ fontSize: '0.82rem', opacity: 0.8 }}>
+                              {feedbacks[selectedFeedbackIndex]?.sentiment === 'negative'
+                                ? `Hi ${feedbacks[selectedFeedbackIndex]?.customer}, thank you for reporting your concerns regarding "${feedbacks[selectedFeedbackIndex]?.theme}". We have logged this index. Our team is working to resolve this issue as soon as possible.`
+                                : `Hi ${feedbacks[selectedFeedbackIndex]?.customer}, thank you for your awesome feedback regarding "${feedbacks[selectedFeedbackIndex]?.theme}"! We are thrilled to hear you have had a positive experience.`}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <EmptyState
+                      icon={Inbox}
+                      title="Inbox Empty"
+                      desc="Incoming reviews will appear here. Connect the widget to start collecting feedback."
+                    />
+                  )}
                 </div>
               )}
 
@@ -641,14 +923,39 @@ export default function Dashboard({ setView, signOut }) {
               {activeSidebarTab === 'Analytics' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
-                    <h1 className="db-page-title">Analytics</h1>
-                    <p className="db-page-subtitle">Feedback trends and performance metrics</p>
+                    <h1 className="db-page-title">Analytics Engine</h1>
+                    <p className="db-page-subtitle">Telemetry event streams and classifier indexes</p>
                   </div>
-                  <EmptyState
-                    icon={BarChart3}
-                    title="No analytics data yet"
-                    desc="Analytics will populate automatically as feedback data is ingested into your workspace."
-                  />
+                  {feedbacks.length > 0 ? (
+                    <div className="db-card" style={{ padding: '24px' }}>
+                      <table className="db-table">
+                        <thead>
+                          <tr>
+                            <th>Feedback Comment Snippet</th>
+                            <th>Theme</th>
+                            <th>Sentiment</th>
+                            <th>Channel</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {feedbacks.map(f => (
+                            <tr key={f.id}>
+                              <td style={{ color: 'var(--db-text-primary)' }}>{f.text.substring(0, 80)}...</td>
+                              <td style={{ fontFamily: 'var(--db-font-mono)', fontSize: '0.72rem' }}>{f.theme}</td>
+                              <td><span className={`db-badge db-badge-${f.sentiment}`}>{f.sentiment}</span></td>
+                              <td>{f.channel}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={BarChart3}
+                      title="No Analytics Available"
+                      desc="Ingest feedback to populate lists and analytical metrics."
+                    />
+                  )}
                 </div>
               )}
 
@@ -673,13 +980,25 @@ export default function Dashboard({ setView, signOut }) {
                     />
                   </div>
 
-                  <div className="db-themes-grid">
+                  {filteredThemes.length > 0 ? (
+                    <div className="db-themes-grid">
+                      {filteredThemes.map(theme => (
+                        <div key={theme.id} className="db-theme-card">
+                          <div className="db-theme-tag-label">Theme class</div>
+                          <div className="db-theme-name">{theme.name}</div>
+                          <div className="db-theme-footer">
+                            <span className="db-theme-count">{theme.count} mentions</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
                     <EmptyState
                       icon={Tag}
-                      title="No themes detected yet"
-                      desc="Themes are automatically detected from your feedback. Add feedback first."
+                      title="No Themes Detected"
+                      desc="Themes will automatically be extracted from your text inputs."
                     />
-                  </div>
+                  )}
                 </div>
               )}
 
@@ -804,20 +1123,33 @@ export default function Dashboard({ setView, signOut }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div className="db-page-header">
                     <div>
-                      <h1 className="db-page-title">Generated Reports</h1>
-                      <p className="db-page-subtitle">download executive briefing summaries</p>
+                      <h1 className="db-page-title">Workspace Briefings</h1>
+                      <p className="db-page-subtitle">download structured feedback summaries</p>
                     </div>
-                    <button className="db-btn db-btn-primary">
-                      <Plus size={13} /><span>Generate Report</span>
-                    </button>
                   </div>
-                  <EmptyState
-                    icon={FileText}
-                    title="No reports yet"
-                    desc="Generate your first report once feedback data has been added."
-                    action="Generate Report"
-                    onAction={() => {}}
-                  />
+
+                  {reports.length > 0 ? (
+                    <div className="db-reports-grid">
+                      {reports.map(r => (
+                        <div key={r.id} className="db-report-card">
+                          <div className="db-report-header">
+                            <div className="db-report-title">{r.title}</div>
+                            <span className="db-report-date">{r.date}</span>
+                          </div>
+                          <p className="db-report-summary">{r.summary}</p>
+                          <button className="db-btn db-btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
+                            <Download size={13} /><span>Download PDF Summary</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={FileText}
+                      title="No Reports Active"
+                      desc="Reports calculate metrics from real feedback. Ingest feedback to activate."
+                    />
+                  )}
                 </div>
               )}
 
@@ -840,7 +1172,7 @@ export default function Dashboard({ setView, signOut }) {
                         <h2 style={{ fontSize: '1.4rem', fontWeight: 600, color: 'var(--db-text-primary)' }}>{userFullName}</h2>
                         <p style={{ color: 'var(--db-text-muted)', fontFamily: 'var(--db-font-mono)', fontSize: '0.8rem', marginTop: '4px' }}>{userEmail}</p>
                         <div style={{ marginTop: '12px' }}>
-                          <span className="db-badge db-badge-channel">Member</span>
+                          <span className="db-badge db-badge-channel">Workspace Administrator</span>
                         </div>
                       </div>
                     </div>
@@ -853,26 +1185,9 @@ export default function Dashboard({ setView, signOut }) {
                       <div className="db-form-group">
                         <label className="db-form-label">Email Address</label>
                         <input type="email" className="db-input" defaultValue={userEmail} disabled style={{ opacity: 0.6 }} />
-                        <span className="db-form-hint">Email is managed via Supabase Auth.</span>
-                      </div>
-                      <div className="db-form-group">
-                        <label className="db-form-label">Timezone</label>
-                        <select className="db-input">
-                          <option>UTC+0 (London, GMT)</option>
-                          <option>UTC-5 (EST)</option>
-                          <option>UTC-8 (PST)</option>
-                          <option>UTC+5:30 (IST)</option>
-                        </select>
+                        <span className="db-form-hint">Email address cannot be changed.</span>
                       </div>
                     </div>
-                    <button className="db-btn db-btn-primary" style={{ marginTop: '20px' }}>Save Changes</button>
-                  </div>
-
-                  <div className="db-card" style={{ padding: '24px' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--db-text-primary)', marginBottom: '16px' }}>Danger Zone</h3>
-                    <button className="db-btn db-btn-outline" style={{ color: '#ff3c3c', borderColor: 'rgba(255,60,60,0.3)' }} onClick={handleSignOut}>
-                      <LogOut size={14} /> Sign Out of LOOP
-                    </button>
                   </div>
                 </div>
               )}
@@ -883,13 +1198,13 @@ export default function Dashboard({ setView, signOut }) {
               {activeSidebarTab === 'Settings' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
-                    <h1 className="db-page-title">Workspace Settings</h1>
-                    <p className="db-page-subtitle">Manage API keys, themes, and workspace details</p>
+                    <h1 className="db-page-title">Console Configurations</h1>
+                    <p className="db-page-subtitle">Manage integration scripts, themes, and model parameters</p>
                   </div>
 
                   <div className="db-settings-layout">
                     <nav className="db-settings-nav">
-                      {['General Settings', 'Theme & Appearance', 'AI Model'].map((item) => (
+                      {['General Settings', 'Theme & Appearance', 'Widget Integration & SDK', 'AI Model'].map((item) => (
                         <div 
                           key={item} 
                           className={`db-settings-nav-item${activeSettingsTab === item ? ' active' : ''}`}
@@ -903,34 +1218,18 @@ export default function Dashboard({ setView, signOut }) {
                     {activeSettingsTab === 'General Settings' && (
                       <div className="db-settings-panel">
                         <div className="db-settings-section-title">General Workspace Configurations</div>
-
                         <div className="db-form-group">
-                          <label className="db-form-label">Account Email</label>
-                          <div className="db-form-static" style={{ fontFamily: 'var(--db-font-mono)', fontSize: '0.78rem' }}>{userEmail}</div>
-                          <span className="db-form-hint">Your email is managed via Supabase Auth.</span>
+                          <label className="db-form-label">Workspace ID Token (API Key)</label>
+                          <div className="db-form-static" style={{ fontFamily: 'var(--db-font-mono)', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
+                            {user?.id || '00000000-0000-0000-0000-000000000000'}
+                          </div>
+                          <span className="db-form-hint">Use this ID token to authenticate SDK ingestion webhooks.</span>
                         </div>
-
                         <div className="db-form-group">
-                          <label className="db-form-label">Display Name</label>
+                          <label className="db-form-label">Workspace Administrator</label>
                           <input type="text" className="db-input" defaultValue={userFullName} />
                         </div>
-
-                        <div className="db-form-group">
-                          <label className="db-form-label">Active Theme</label>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div className="db-form-static" style={{ flex: 1, fontFamily: 'var(--db-font-mono)', textTransform: 'capitalize' }}>
-                              {themeOptions.find(t => t.id === dashboardTheme)?.name || dashboardTheme}
-                            </div>
-                            <button className="db-btn db-btn-secondary" onClick={() => setActiveSettingsTab('Theme & Appearance')}>
-                              Customize →
-                            </button>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-                          <button className="db-btn db-btn-primary">Save Changes</button>
-                          <button className="db-btn db-btn-secondary">Reset to Defaults</button>
-                        </div>
+                        <button className="db-btn db-btn-primary">Save Changes</button>
                       </div>
                     )}
 
@@ -938,7 +1237,7 @@ export default function Dashboard({ setView, signOut }) {
                       <div className="db-settings-panel">
                         <div className="db-settings-section-title">Theme & Appearance Customization</div>
                         <p style={{ fontSize: '0.78rem', color: 'var(--db-text-muted)', marginBottom: '18px', lineHeight: 1.5 }}>
-                          Select your preferred color scheme. Your chosen theme persists across sessions via local storage.
+                          Select your preferred color scheme. Your chosen theme persists across sessions.
                         </p>
 
                         <div className="db-theme-picker-grid">
@@ -952,9 +1251,9 @@ export default function Dashboard({ setView, signOut }) {
                                 <span className="db-theme-badge-active">Active</span>
                               )}
                               <div className="db-theme-swatch-bar">
-                                <div className="db-theme-swatch-block" style={{ background: t.bg }} title="Background" />
-                                <div className="db-theme-swatch-block" style={{ background: t.surface }} title="Surface" />
-                                <div className="db-theme-swatch-block" style={{ background: t.accent }} title="Accent" />
+                                <div className="db-theme-swatch-block" style={{ background: t.bg }} />
+                                <div className="db-theme-swatch-block" style={{ background: t.surface }} />
+                                <div className="db-theme-swatch-block" style={{ background: t.accent }} />
                               </div>
                               <div className="db-theme-option-info">
                                 <div className="db-theme-option-name">{t.name}</div>
@@ -962,6 +1261,86 @@ export default function Dashboard({ setView, signOut }) {
                               </div>
                             </div>
                           ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeSettingsTab === 'Widget Integration & SDK' && (
+                      <div className="db-settings-panel">
+                        <div className="db-settings-section-title">Integrate LOOP Into Your Website</div>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--db-text-muted)', lineHeight: '1.6', marginBottom: '18px' }}>
+                          Add customer feedback widgets to your website to ingest logs. Copy this tracking script and place it inside the head tags of your site.
+                        </p>
+
+                        {/* Integration instructions snippet */}
+                        <div className="db-form-group">
+                          <label className="db-form-label">Embeddable Widget HTML Script</label>
+                          <div style={{ position: 'relative' }}>
+                            <pre style={{
+                              background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid var(--db-border)',
+                              borderRadius: '8px',
+                              padding: '16px',
+                              fontFamily: 'var(--db-font-mono)',
+                              fontSize: '0.68rem',
+                              color: '#fff',
+                              overflowX: 'auto',
+                              lineHeight: '1.5'
+                            }}>
+{`<!-- Place this code snippet before </body> on your website -->
+<script 
+  src="https://loop-intelligence.vercel.app/widget.js" 
+  data-workspace-id="${user?.id || '00000000-0000-0000-0000-000000000000'}"
+  async>
+</script>`}
+                            </pre>
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                navigator.clipboard.writeText(`<!-- Place this before </body> on your website -->\n<script \n  src="https://loop-intelligence.vercel.app/widget.js" \n  data-workspace-id="${user?.id || '00000000-0000-0000-0000-000000000000'}"\n  async>\n</script>`);
+                                alert("Script snippet copied to clipboard!");
+                              }}
+                              style={{
+                                position: 'absolute',
+                                right: '12px',
+                                top: '12px',
+                                background: 'rgba(255,255,255,0.06)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '0.62rem',
+                                color: 'rgba(255,255,255,0.6)'
+                              }}
+                            >
+                              Copy Code
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* REST Ingestion API details */}
+                        <div className="db-form-group">
+                          <label className="db-form-label">Direct REST API Ingestion Endpoint</label>
+                          <pre style={{
+                            background: 'rgba(0,0,0,0.3)',
+                            border: '1px solid var(--db-border)',
+                            borderRadius: '8px',
+                            padding: '16px',
+                            fontFamily: 'var(--db-font-mono)',
+                            fontSize: '0.68rem',
+                            color: '#fff',
+                            overflowX: 'auto',
+                            lineHeight: '1.5'
+                          }}>
+{`POST /api/feedback/ingest
+Content-Type: application/json
+
+{
+  "text": "Your customer review comment here...",
+  "channel": "Website Widget",
+  "customer": "Alex Rivera",
+  "userId": "${user?.id || '00000000-0000-0000-0000-000000000000'}"
+}`}
+                          </pre>
                         </div>
                       </div>
                     )}
@@ -978,7 +1357,7 @@ export default function Dashboard({ setView, signOut }) {
                         {localStorage.getItem('loop_nvidia_api_key') && (
                           <div className="model-status-line" style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#10b981' }}>
                             <div className="model-status-dot active" />
-                            API key configured — AI is active
+                            API key configured — AI Classifier Active
                           </div>
                         )}
                       </div>
@@ -986,9 +1365,24 @@ export default function Dashboard({ setView, signOut }) {
                   </div>
                 </div>
               )}
-
             </>
           )}
+
+          {/* Loading Screen */}
+          {loadingData && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '400px',
+              fontFamily: 'var(--db-font-mono, monospace)',
+              color: 'var(--db-text-muted)',
+              fontSize: '0.8rem'
+            }}>
+              [ SYNCING CONSOLE TELEMETRY EVENTS... ]
+            </div>
+          )}
+
         </div>
       </main>
     </div>

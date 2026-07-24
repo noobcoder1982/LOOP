@@ -41,3 +41,6 @@ Thumbs.db
 # Vite / Rolldown cache
 .vite/
 .rolldown/
+
+# Next.js build output
+.next/
