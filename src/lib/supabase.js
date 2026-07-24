@@ -1,18 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Retrieve environment variables safely across both server (process.env) and browser/Vite environments
+// Next.js statically inlines environment variables prefixed with NEXT_PUBLIC_ to the browser bundle
 const supabaseUrl = 
-  (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL || process.env?.NEXT_PUBLIC_SUPABASE_URL : '') ||
-  (typeof window !== 'undefined' ? window.__ENV__?.VITE_SUPABASE_URL : '');
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 
+  process.env.VITE_SUPABASE_URL ||
+  '';
 
 const supabaseAnonKey = 
-  (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_ANON_KEY || process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY : '') ||
-  (typeof window !== 'undefined' ? window.__ENV__?.VITE_SUPABASE_ANON_KEY : '');
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
     '[LOOP] Supabase environment variables are missing. ' +
-    'Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your env configuration.'
+    'Please ensure you have configured NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
   );
 }
 
