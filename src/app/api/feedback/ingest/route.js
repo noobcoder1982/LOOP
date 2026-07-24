@@ -105,6 +105,7 @@ export async function POST(req) {
 
       if (error) {
         console.error('[Supabase Insert Error]:', error);
+        return NextResponse.json({ error: `Database Error: ${error.message}` }, { status: 500, headers: corsHeaders });
       } else {
         savedData = data?.[0];
 
@@ -127,20 +128,14 @@ export async function POST(req) {
             .insert([{ user_id: activeUserId, name: theme, count: 1 }]);
         }
       }
+    } else {
+      return NextResponse.json({ error: 'Database environment variables are missing on the server.' }, { status: 500, headers: corsHeaders });
     }
 
     // Return the categorized item
     return NextResponse.json({
       success: true,
-      feedback: savedData || {
-        text,
-        sentiment,
-        channel: activeChannel,
-        customer: activeCustomer,
-        theme,
-        status: 'NEW',
-        date: new Date().toISOString()
-      }
+      feedback: savedData
     }, { headers: corsHeaders });
   } catch (error) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500, headers: corsHeaders });
