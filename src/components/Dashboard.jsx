@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
   LayoutDashboard, 
@@ -34,7 +35,10 @@ import {
   ChevronRight,
   Key,
   Zap,
-  Code
+  Code,
+  Paperclip,
+  CornerDownLeft,
+  Mic
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext.jsx';
 import './Dashboard.css';
@@ -164,9 +168,7 @@ export default function Dashboard({ setView, signOut }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    { sender: 'ai', text: 'hello. i am the LOOP AI assistant. add your NVIDIA API key in the model settings to get started. click the ⚡ button in the top bar.' }
-  ]);
+  const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [isSendingChat, setIsSendingChat] = useState(false);
   const [themeSearchQuery, setThemeSearchQuery] = useState('');
@@ -1030,100 +1032,174 @@ Question: ${targetMsg}`;
                   ║  TAB: ASK LOOP (CHAT)                ║
                   ╚══════════════════════════════════════╝ */}
               {activeSidebarTab === 'Ask LOOP' && (
-                <div className="db-chat-container">
-                  <div className="db-chat-header">
-                    <div className="db-chat-header-info">
-                      <div className="db-chat-header-icon"><Sparkles size={16} /></div>
-                      <div>
-                        <h2 className="db-chat-header-title">LOOP AI Assistant</h2>
-                        <span className="db-chat-header-subtitle">
-                          {localStorage.getItem('loop_nvidia_api_key')
-                            ? `Active: ${localStorage.getItem('loop_model') || 'deepseek-ai/deepseek-v4-flash'}`
-                            : 'No API key — configure in Model Settings'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="db-chat-header-actions">
-                      <button
-                        className="db-btn db-btn-primary"
-                        style={{ fontSize: '0.65rem', padding: '4px 10px', height: '28px' }}
-                        onClick={() => setShowModelModal(true)}
-                        title="Configure AI model"
+                <div className="db-chat-premium-container">
+                  <AnimatePresence mode="wait">
+                    {chatMessages.length === 0 ? (
+                      <motion.div 
+                        key="landing"
+                        className="db-chat-landing"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, y: -20, filter: "blur(10px)", transition: { duration: 0.3 } }}
+                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                       >
-                        <Zap size={12} /> Model Settings
-                      </button>
-                      <button className="db-btn db-btn-ghost" onClick={() => setChatMessages([{ sender: 'ai', text: 'hello. i am the LOOP AI assistant. how can i help you today?' }])} title="Clear Chat">
-                        <RefreshCw size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="db-chat-scroll-area">
-                    {chatMessages.length <= 1 && (
-                      <div className="db-chat-empty-state">
-                        <div className="db-chat-empty-icon">l.</div>
-                        <h3 className="db-chat-empty-title">How can I help you?</h3>
-                        <p className="db-chat-empty-desc">Ask about your workspace data, trends, or let me summarize feedback.</p>
-                        <div className="db-chat-suggestion-cards">
-                          {['Analyze latest feedback', 'Summarize negative themes', 'How does LOOP work?'].map(s => (
-                            <div key={s} className="db-chat-suggestion-card" onClick={() => handleSendChat(s)}>
-                              {s} <ArrowUpRight size={14} />
+                        <motion.div 
+                          className="db-chat-landing-logo"
+                          animate={{ opacity: [0.7, 1, 0.7], y: [-2, 2, -2] }}
+                          transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
+                        >
+                          <Sparkles size={32} strokeWidth={1.5} />
+                        </motion.div>
+                        <h2 className="db-chat-landing-title">What would you like to analyze today?</h2>
+                        <p className="db-chat-landing-subtitle">Ask questions about customer feedback, trends, reports and insights.</p>
+                        
+                        <div className="db-chat-landing-input-container">
+                          <div className="db-premium-composer landing-composer">
+                            <textarea 
+                              className="db-premium-textarea"
+                              placeholder="Ask LOOP anything..."
+                              value={chatInput}
+                              onChange={(e) => {
+                                setChatInput(e.target.value);
+                                e.target.style.height = 'auto';
+                                e.target.style.height = (e.target.scrollHeight) + 'px';
+                              }}
+                              onKeyDown={(e) => { 
+                                if(e.key === 'Enter' && !e.shiftKey) { 
+                                  e.preventDefault(); 
+                                  handleSendChat(); 
+                                } 
+                              }}
+                              rows={1}
+                            />
+                            <div className="db-premium-composer-footer">
+                              <div className="db-premium-composer-actions-left">
+                                <button className="db-premium-icon-btn"><Paperclip size={16} /></button>
+                                <button className="db-premium-icon-btn" onClick={() => setShowModelModal(true)}>
+                                  <Zap size={16} /> 
+                                  <span style={{marginLeft: 6, fontSize: '11px', opacity: 0.7}}>{localStorage.getItem('loop_model') ? localStorage.getItem('loop_model').split('/')[1] : 'Model'}</span>
+                                </button>
+                              </div>
+                              <button 
+                                className={`db-premium-send-btn ${chatInput.trim() ? 'active' : ''}`}
+                                onClick={() => handleSendChat()}
+                                disabled={!chatInput.trim()}
+                              >
+                                <ArrowUpRight size={16} />
+                              </button>
                             </div>
+                          </div>
+                        </div>
+
+                        <div className="db-chat-landing-suggestions">
+                          {['Analyze recent feedback', 'Customer sentiment', 'Product pain points', 'Weekly summary', 'Feature requests', 'Churn analysis'].map((s, i) => (
+                            <motion.button 
+                              key={s} 
+                              className="db-chat-suggestion-pill" 
+                              onClick={() => handleSendChat(s)}
+                              initial={{ opacity: 0, y: 15 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.15 + i * 0.05, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                              whileHover={{ scale: 1.03, backgroundColor: 'rgba(255,255,255,0.08)' }}
+                              whileTap={{ scale: 0.97 }}
+                            >
+                              {s}
+                            </motion.button>
                           ))}
                         </div>
-                      </div>
-                    )}
-
-                    <div className="db-chat-messages-wrapper">
-                      {chatMessages.map((msg, idx) => (
-                        <div key={idx} className={`db-message-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`}>
-                          {msg.sender === 'ai' && (
-                            <div className="db-message-avatar ai-avatar">
+                      </motion.div>
+                    ) : (
+                      <motion.div 
+                        key="active-chat"
+                        className="db-chat-active-workspace"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                      >
+                        <div className="db-chat-premium-header">
+                          <div className="db-chat-header-left">
+                            <div className="db-chat-header-model-pill" onClick={() => setShowModelModal(true)}>
                               <Sparkles size={12} />
+                              <span>{localStorage.getItem('loop_model') || 'Select Model'}</span>
+                              <ChevronDown size={12} />
                             </div>
-                          )}
-                          <div className={`db-message-bubble ${msg.sender === 'user' ? 'user-bubble' : 'ai-bubble'}`}>
-                            {msg.text.includes('```json:chart') ? (() => {
-                              const parts = msg.text.split('```json:chart');
-                              const beforeText = parts[0].replace('--- Thinking Process ---', '').trim();
-                              const jsonPart = parts[1].split('```')[0].trim();
-                              let chartData = [];
-                              try { chartData = JSON.parse(jsonPart); } catch(e){}
-                              
-                              return (
-                                <div>
-                                  {beforeText && <div className="db-message-text" style={{ marginBottom: 12 }}>{beforeText}</div>}
-                                  {chartData.length > 0 && (
-                                    <div style={{ width: '100%', height: 220, marginTop: 8 }}>
-                                      <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={chartData}>
-                                          <XAxis dataKey="name" stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
-                                          <Tooltip 
-                                            cursor={{fill: 'rgba(255,255,255,0.05)'}} 
-                                            contentStyle={{backgroundColor: '#111', border: '1px solid #333', borderRadius: 4, color: '#fff'}} 
-                                          />
-                                          <Bar dataKey="value" fill="#ff3c3c" radius={[4, 4, 0, 0]} />
-                                        </BarChart>
-                                      </ResponsiveContainer>
-                                    </div>
+                          </div>
+                          <div className="db-chat-header-right">
+                            <button className="db-premium-icon-btn" onClick={() => setChatMessages([])} title="New Chat">
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="db-chat-premium-scroll">
+                          <div className="db-chat-premium-messages">
+                            {chatMessages.map((msg, idx) => (
+                              <motion.div 
+                                key={idx} 
+                                className={`db-premium-msg-row ${msg.sender === 'user' ? 'user-row' : 'ai-row'}`}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.3 }}
+                              >
+                                {msg.sender === 'ai' && (
+                                  <div className="db-premium-avatar ai-avatar">
+                                    <Sparkles size={14} />
+                                  </div>
+                                )}
+                                <div className={`db-premium-bubble ${msg.sender === 'user' ? 'user-bubble' : 'ai-bubble'}`}>
+                                  {msg.text.includes('```json:chart') ? (() => {
+                                    const parts = msg.text.split('```json:chart');
+                                    const beforeText = parts[0].replace('--- Thinking Process ---', '').trim();
+                                    const jsonPart = parts[1].split('```')[0].trim();
+                                    let chartData = [];
+                                    try { chartData = JSON.parse(jsonPart); } catch(e){}
+                                    
+                                    return (
+                                      <div>
+                                        {beforeText && <div className="db-premium-msg-text" style={{ marginBottom: 16 }}>{beforeText}</div>}
+                                        {chartData.length > 0 && (
+                                          <div className="db-premium-chart-wrapper">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                              <BarChart data={chartData}>
+                                                <XAxis dataKey="name" stroke="#666" fontSize={11} tickLine={false} axisLine={false} />
+                                                <Tooltip cursor={{fill: 'rgba(255,255,255,0.03)'}} contentStyle={{backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: 8, color: '#fff'}} />
+                                                <Bar dataKey="value" fill="#ff3c3c" radius={[4, 4, 0, 0]} />
+                                              </BarChart>
+                                            </ResponsiveContainer>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })() : msg.text.includes('--- Thinking Process ---') ? (() => {
+                                    const parts = msg.text.split('--- Response ---');
+                                    const thinking = parts[0].replace('--- Thinking Process ---', '').trim();
+                                    const resp = parts[1]?.trim() || '';
+                                    return (
+                                      <div>
+                                        <details className="db-premium-thinking">
+                                          <summary>Thinking Process</summary>
+                                          <div className="db-premium-thinking-content">{thinking}</div>
+                                        </details>
+                                        <div className="db-premium-msg-text">{resp}</div>
+                                      </div>
+                                    );
+                                  })() : (
+                                    <div className="db-premium-msg-text">{msg.text}</div>
                                   )}
                                 </div>
-                              );
-                            })() : msg.text.includes('--- Thinking Process ---') ? (() => {
-                              const parts = msg.text.split('--- Response ---');
-                              const thinking = parts[0].replace('--- Thinking Process ---', '').trim();
-                              const resp = parts[1]?.trim() || '';
-                              return (
-                                <div>
-                                  <details className="db-message-thinking">
-                                    <summary>View thinking process</summary>
-                                    <div className="db-message-thinking-content">{thinking}</div>
-                                  </details>
-                                  <div className="db-message-text">{resp}</div>
+                              </motion.div>
+                            ))}
+                            {isSendingChat && (
+                              <motion.div 
+                                className="db-premium-msg-row ai-row"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                              >
+                                <div className="db-premium-avatar ai-avatar"><Sparkles size={14} /></div>
+                                <div className="db-premium-bubble ai-bubble typing-indicator">
+                                  <span></span><span></span><span></span>
                                 </div>
-                              );
-                            })() : (
-                              <div className="db-message-text">{msg.text}</div>
+                              </motion.div>
                             )}
                           </div>
                           {msg.sender === 'user' && (
