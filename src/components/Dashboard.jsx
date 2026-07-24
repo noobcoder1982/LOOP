@@ -241,10 +241,7 @@ export default function Dashboard({ setView, signOut }) {
 
   const themeOptions = [
     { id: 'dark', name: 'Obsidian Dark', desc: 'Default stealth dark mode with crimson accents', bg: '#000000', surface: '#0a0a0c', accent: '#ff3c3c' },
-    { id: 'light', name: 'Daylight Light', desc: 'Clean high-contrast slate light mode', bg: '#f8fafc', surface: '#ffffff', accent: '#dc2626' },
-    { id: 'midnight', name: 'Midnight Slate', desc: 'Deep navy blue & sapphire developer theme', bg: '#0b0f19', surface: '#111827', accent: '#3b82f6' },
-    { id: 'cyberpunk', name: 'Cyberpunk Neon', desc: 'Neon pink & violet synthwave console', bg: '#090314', surface: '#120726', accent: '#ff0055' },
-    { id: 'emerald', name: 'Emerald Matrix', desc: 'Hacker green terminal obsidian theme', bg: '#02120a', surface: '#052112', accent: '#10b981' }
+    { id: 'light', name: 'Daylight Light', desc: 'Clean high-contrast slate light mode', bg: '#f8fafc', surface: '#ffffff', accent: '#dc2626' }
   ];
 
   const handleThemeChange = (newThemeKey) => {
@@ -597,7 +594,7 @@ export default function Dashboard({ setView, signOut }) {
             <button
               className="db-topbar-icon-btn"
               title={`Theme: ${dashboardTheme} (click to cycle)`}
-              onClick={() => handleThemeChange(dashboardTheme === 'dark' ? 'light' : dashboardTheme === 'light' ? 'midnight' : dashboardTheme === 'midnight' ? 'cyberpunk' : dashboardTheme === 'cyberpunk' ? 'emerald' : 'dark')}
+              onClick={() => handleThemeChange(dashboardTheme === 'dark' ? 'light' : 'dark')}
             >
               <Sun size={16} />
             </button>

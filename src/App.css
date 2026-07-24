@@ -2082,7 +2082,7 @@ body {
   text-shadow: 0 0 8px #ff2a2a;
 }
 
-/* ─── Cinematic Preloader ─────────────────────────────────────── */
+/* ─── Cinematic Split Preloader with Numerical Counter ─────────────────── */
 
 .preloader-container {
   position: fixed;
@@ -2099,40 +2099,100 @@ body {
   justify-content: center;
 }
 
-.preloader-panel-top {
+.preloader-panel-left {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 50vh;
+  width: 50vw;
+  height: 100vh;
   background: #000000;
   z-index: 1;
   will-change: transform;
+  border-right: 1px solid rgba(255, 60, 60, 0.15);
 }
 
-.preloader-panel-bottom {
+.preloader-panel-right {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100vw;
-  height: 50vh;
+  top: 0;
+  right: 0;
+  width: 50vw;
+  height: 100vh;
   background: #000000;
   z-index: 1;
   will-change: transform;
+  border-left: 1px solid rgba(255, 60, 60, 0.15);
 }
 
-/* ── Typography Stage (Scenes 1 & 2) ───────────────────────────── */
+.preloader-split-line {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 100vh;
+  background: #ff3c3c;
+  box-shadow: 0 0 12px #ff3c3c;
+  z-index: 2;
+  will-change: opacity, background-color;
+}
+
+/* ── Typography Stage & Numerical Counter ───────────────────────────── */
 .preloader-type-stage {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.55em;
   pointer-events: none;
-  z-index: 2;
-  /* gap between words: LOOP · X · HUMAN */
+  z-index: 3;
 }
+
+.preloader-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: pulseLoader 2s infinite ease-in-out;
+}
+
+@keyframes pulseLoader {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.98); }
+}
+
+.preloader-brand {
+  font-family: var(--db-font-mono, monospace);
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #ffffff;
+  text-transform: uppercase;
+  margin-left: 0.15em;
+}
+
+.preloader-brand span {
+  color: #ff3c3c;
+}
+
+.preloader-percentage {
+  font-family: var(--db-font-mono, monospace);
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: #ff3c3c;
+  text-shadow: 0 0 20px rgba(255, 60, 60, 0.35);
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.preloader-sync-text {
+  font-family: var(--db-font-mono, monospace);
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
 
 .preloader-word {
   display: inline-flex;

@@ -300,71 +300,48 @@ export default function Home() {
       }
     });
 
-    const hasPreloader = gsap.utils.toArray('.preloader-word-mask').length > 0;
+    const hasPreloader = document.querySelector('.preloader-container') !== null;
 
     if (hasPreloader) {
-      gsap.set('.preloader-word-mask', { clipPath: 'inset(0 0 100% 0)' });
-      gsap.set('.preloader-slice', { scaleX: 0, opacity: 0 });
+      // Numerical Loader animation
+      const progressObj = { value: 0 };
+      mainTl.to(progressObj, {
+        value: 100,
+        duration: 1.8,
+        ease: "power2.out",
+        onUpdate: () => {
+          const el = document.getElementById("preloader-percentage");
+          if (el) {
+            el.innerText = `${Math.floor(progressObj.value).toString().padStart(2, '0')}%`;
+          }
+        }
+      }, 0.2);
 
-      mainTl.to('.preloader-word-mask', {
-        clipPath: 'inset(0 0 0% 0)',
-        duration: 0.9,
-        ease: 'expo.inOut',
-        stagger: 0.1
-      }, 0.3);
-
-      const slices = gsap.utils.toArray('.preloader-slice');
-      slices.forEach((slice, i) => {
-        gsap.set(slice, {
-          top: `${28 + i * 10}%`,
-          transformOrigin: 'left center',
-        });
-        mainTl.fromTo(slice,
-          { scaleX: 0, opacity: 1 },
-          { scaleX: 1, opacity: 1, duration: 0.22, ease: 'power4.inOut' },
-          1.3 + i * 0.1
-        );
-        mainTl.to(slice, {
-          scaleX: 1, opacity: 0, duration: 0.15, ease: 'power2.in'
-        }, 1.3 + i * 0.1 + 0.22);
-      });
-
-      mainTl.to('#pl-word-x .preloader-word-mask', {
-        clipPath: 'inset(50% 0 50% 0)',
-        duration: 0.4,
-        ease: 'power4.inOut'
-      }, 1.5);
-
-      mainTl.to('#pl-word-human .preloader-word-mask', {
-        clipPath: 'inset(50% 0 50% 0)',
-        duration: 0.45,
-        ease: 'power4.inOut'
-      }, 1.7);
-
-      mainTl.to('#pl-word-loop', {
-        x: 0,
-        duration: 0.6,
-        ease: 'expo.inOut'
-      }, 2.0);
-
-      mainTl.to('.preloader-panel-top', {
-        yPercent: -100,
-        duration: 1.2,
-        ease: 'power4.inOut'
-      }, 3.1);
-
-      mainTl.to('.preloader-panel-bottom', {
-        yPercent: 100,
-        duration: 1.2,
-        ease: 'power4.inOut'
-      }, 3.1);
-
-      mainTl.to('.preloader-type-stage', {
+      // Fade out counter & sync text
+      mainTl.to(".preloader-counter", {
         opacity: 0,
-        scale: 1.1,
-        duration: 0.8,
-        ease: 'power3.out'
-      }, 3.1);
+        scale: 0.95,
+        duration: 0.35,
+        ease: "power2.in"
+      }, "+=0.1");
+
+      // Fade out middle split line and slide left/right curtains open
+      mainTl.to(".preloader-split-line", {
+        opacity: 0,
+        duration: 0.15
+      }, "-=0.15");
+
+      mainTl.to(".preloader-panel-left", {
+        xPercent: -100,
+        duration: 1.0,
+        ease: "power4.inOut"
+      }, "-=0.1");
+
+      mainTl.to(".preloader-panel-right", {
+        xPercent: 100,
+        duration: 1.0,
+        ease: "power4.inOut"
+      }, "<");
     }
 
     mainTl.fromTo(leftHandRef.current, 
@@ -587,33 +564,18 @@ export default function Home() {
         {/* CINEMATIC PRELOADER */}
         {showPreloader && (
           <div className="preloader-container">
-            <div className="preloader-panel-top" />
-            <div className="preloader-panel-bottom" />
+            <div className="preloader-panel-left" />
+            <div className="preloader-panel-right" />
+            <div className="preloader-split-line" />
             
             <div className="preloader-type-stage">
-              <div className="preloader-word" id="pl-word-loop">
-                <div className="preloader-word-mask">
-                  <span className="preloader-word-inner">LOOP</span>
+              <div className="preloader-counter">
+                <div className="preloader-brand">
+                  loop<span>.</span>
                 </div>
+                <div className="preloader-percentage" id="preloader-percentage">00%</div>
+                <div className="preloader-sync-text">syncing telemetry events...</div>
               </div>
-              <div className="preloader-word" id="pl-word-x">
-                <div className="preloader-word-mask">
-                  <span className="preloader-word-inner pl-accent">X</span>
-                </div>
-              </div>
-              <div className="preloader-word" id="pl-word-human">
-                <div className="preloader-word-mask">
-                  <span className="preloader-word-inner">HUMAN</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="preloader-slices" aria-hidden="true">
-              <div className="preloader-slice" />
-              <div className="preloader-slice" />
-              <div className="preloader-slice" />
-              <div className="preloader-slice" />
-              <div className="preloader-slice" />
             </div>
           </div>
         )}
