@@ -372,6 +372,20 @@ export default function Dashboard({ setView, signOut }) {
       const savedKey = localStorage.getItem('loop_nvidia_api_key') || '';
       const savedModel = localStorage.getItem('loop_model') || 'deepseek-ai/deepseek-v4-flash';
 
+      const contextPrompt = `You are LOOP AI, an executive customer feedback assistant.
+      
+Here is the current workspace data context:
+- Total Feedbacks: ${feedbacks.length}
+- Positive: ${feedbacks.filter(f => f.sentiment === 'positive').length}
+- Negative: ${feedbacks.filter(f => f.sentiment === 'negative').length}
+- Neutral: ${feedbacks.filter(f => f.sentiment === 'neutral').length}
+
+Recent Feedbacks:
+${feedbacks.slice(0, 10).map(f => `- [${(f.sentiment || 'unknown').toUpperCase()}] from ${f.customer}: "${f.text}"`).join('\n')}
+
+Based on this data, answer the user's question briefly (2-3 sentences max).
+Question: ${targetMsg}`;
+
       const response = await fetch("/api/nvidia/chat/completions", {
         method: "POST",
         headers: {
@@ -380,7 +394,7 @@ export default function Dashboard({ setView, signOut }) {
         },
         body: JSON.stringify({
           model: savedModel,
-          messages: [{ role: "user", content: `You are LOOP AI, an executive customer feedback assistant. Explain briefly (2-3 sentences max). Question: ${targetMsg}` }]
+          messages: [{ role: "user", content: contextPrompt }]
         })
       });
 
