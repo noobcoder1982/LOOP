@@ -3474,7 +3474,7 @@ select.db-input option {
 
 [data-dashboard-theme="light"] .db-nav-item.active {
   background: rgba(255, 60, 60, 0.05) !important;
-  border-left: 3px solid #ff3c3c !important;
+  border: 1px solid rgba(255, 60, 60, 0.2) !important;
 }
 
 [data-dashboard-theme="light"] .db-sidebar-action {
@@ -3634,7 +3634,8 @@ select.db-input option {
 }
 
 [data-dashboard-theme="light"] .db-inbox-item.active {
-  border-left: 3px solid #ff3c3c !important;
+  border: 1px solid rgba(255, 60, 60, 0.25) !important;
+  box-shadow: 0 4px 12px rgba(255, 60, 60, 0.05) !important;
 }
 
 [data-dashboard-theme="light"] .db-inbox-customer {
