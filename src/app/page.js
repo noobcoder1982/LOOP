@@ -317,8 +317,8 @@ export default function Home() {
         }
       }, 0.2);
 
-      // Fade out counter & sync text
-      mainTl.to(".preloader-counter", {
+      // Fade out brand & stats text before opening
+      mainTl.to([".preloader-brand-side", ".preloader-stats-side"], {
         opacity: 0,
         scale: 0.95,
         duration: 0.35,
@@ -564,19 +564,19 @@ export default function Home() {
         {/* CINEMATIC PRELOADER */}
         {showPreloader && (
           <div className="preloader-container">
-            <div className="preloader-panel-left" />
-            <div className="preloader-panel-right" />
-            <div className="preloader-split-line" />
+            <div className="preloader-panel-left">
+              <div className="preloader-brand-side">
+                loop<span>.</span>
+              </div>
+            </div>
             
-            <div className="preloader-type-stage">
-              <div className="preloader-counter">
-                <div className="preloader-brand">
-                  loop<span>.</span>
-                </div>
+            <div className="preloader-panel-right">
+              <div className="preloader-stats-side">
                 <div className="preloader-percentage" id="preloader-percentage">00%</div>
                 <div className="preloader-sync-text">syncing telemetry events...</div>
               </div>
             </div>
+            <div className="preloader-split-line" />
           </div>
         )}
 
