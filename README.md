@@ -164,6 +164,20 @@ All server-side endpoints forward client auth tokens (`Bearer <JWT>`) dynamicall
 
 ---
 
+## `[demo credentials checklist]`
+
+To test and verify **Role-Based Access Control (RBAC)** policies without having to register new accounts, use these pre-seeded demo user credentials mapping to the same seed workspace:
+
+| Role | Email Address | Password | Clearances |
+|------|---------------|----------|------------|
+| **ADMIN** | `admin@loop.intel` | `loop12345` | Manage teammates/roles, ingest, update status, delete |
+| **ANALYST** | `analyst@loop.intel` | `loop12345` | Ingest feedback, update status, delete |
+| **VIEWER** | `viewer@loop.intel` | `loop12345` | Read-only access to dashboard, inbox, ask loop |
+
+*To seed these exact credentials in your database, execute the [demo_workspace_seed.sql](file:///c:/Users/DELL/Desktop/loop/demo_workspace_seed.sql) script in your Supabase SQL editor.*
+
+---
+
 ## `[cinematic product demo]`
 
 A pre-recorded or interactive cinematic showcase is available. It runs dynamically, simulating dashboard data loads, chat query typing, and report outputs:
