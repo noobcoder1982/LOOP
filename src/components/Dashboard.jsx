@@ -287,7 +287,7 @@ export default function Dashboard({ setView, signOut }) {
 
   // Fetch from database API
   const fetchWorkspaceData = async () => {
-    if (!user) return;
+    if (!user || !session) return;
     setLoadingData(true);
     try {
       const headers = { 'Authorization': `Bearer ${session?.access_token}` };
@@ -313,7 +313,7 @@ export default function Dashboard({ setView, signOut }) {
 
   useEffect(() => {
     fetchWorkspaceData();
-  }, [user]);
+  }, [user, session]);
 
   useEffect(() => {
     if (activeSidebarTab === 'Settings' && activeSettingsTab === 'Workspace Members') {
